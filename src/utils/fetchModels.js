@@ -3,8 +3,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // Funzione per ottenere i modelli di Gemini (via API)
 export const fetchGeminiModels = async (apiKey) => {
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    // Gemini non ha un endpoint list_models nel SDK browser, ma possiamo usare fetch diretto
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
     );
@@ -12,8 +10,9 @@ export const fetchGeminiModels = async (apiKey) => {
     if (data.models) {
       return data.models
         .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+        .filter(m => m.name.includes('gemini'))  // solo modelli Gemini, non Gemma
         .map(m => ({
-          id: m.name.replace('models/', ''),
+          id: m.name.replace('models/', ''),  // es: "gemini-2.5-flash"
           name: m.displayName || m.name.replace('models/', '')
         }));
     }
@@ -45,7 +44,7 @@ export const fetchOpenAIModels = async (apiKey) => {
 
 // Funzione per ottenere i modelli di DeepSeek
 export const fetchDeepSeekModels = async (apiKey) => {
-  // DeepSeek ha solo pochi modelli, non c'è endpoint list
+  // DeepSeek ha solo pochi modelli
   return [
     { id: "deepseek-chat", name: "DeepSeek Chat" },
     { id: "deepseek-coder", name: "DeepSeek Coder" },
@@ -71,7 +70,6 @@ export const fetchMistralModels = async (apiKey) => {
 
 // Funzione per ottenere i modelli di Claude
 export const fetchClaudeModels = async (apiKey) => {
-  // Anthropic ha endpoint per listare modelli
   try {
     const response = await fetch("https://api.anthropic.com/v1/models", {
       headers: {
@@ -100,7 +98,7 @@ export const fetchOllamaModels = async (baseURL = "http://localhost:11434") => {
     }
     return [];
   } catch (error) {
-    console.error("Errore fetch modelli Ollama (assicurati che Ollama sia in esecuzione):", error);
+    console.error("Errore fetch modelli Ollama:", error);
     return [];
   }
 };
