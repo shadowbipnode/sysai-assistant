@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import LANGS, { FREE_MODES } from "./i18n";
+import { AI_PROVIDERS, callAI, buildLogAnalysisPrompt, buildCommandPrompt } from "./utils/aiProviders";
+import { fetchModelsForProvider } from "./utils/fetchModels";
 
 function App() {
   const [lang, setLang] = useState("en");
@@ -7,6 +9,11 @@ function App() {
   const [page, setPage] = useState("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [apiKeys, setApiKeys] = useState({});
+  const [selectedModels, setSelectedModels] = useState({});
+  const [availableModels, setAvailableModels] = useState({});
+  const [loadingModels, setLoadingModels] = useState({});
+  const [defaultProvider, setDefaultProvider] = useState("gemini");
+  const [systemProfile, setSystemProfile] = useState("");
   const [showResult, setShowResult] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -16,6 +23,55 @@ function App() {
   const [selectedService, setSelectedService] = useState(0);
   const [showProBanner, setShowProBanner] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [commandResult, setCommandResult] = useState(null);
+
+  // Carica impostazioni salvate
+  useEffect(() => {
+    const savedApiKeys = localStorage.getItem("sysai_api_keys");
+    const savedSelectedModels = localStorage.getItem("sysai_selected_models");
+    const savedDefaultProvider = localStorage.getItem("sysai_default_provider");
+    const savedSystemProfile = localStorage.getItem("sysai_system_profile");
+    const savedLang = localStorage.getItem("sysai_lang");
+    const savedTheme = localStorage.getItem("sysai_theme");
+    
+    if (savedApiKeys) setApiKeys(JSON.parse(savedApiKeys));
+    if (savedSelectedModels) setSelectedModels(JSON.parse(savedSelectedModels));
+    if (savedDefaultProvider) setDefaultProvider(savedDefaultProvider);
+    if (savedSystemProfile) setSystemProfile(savedSystemProfile);
+    if (savedLang) setLang(savedLang);
+    if (savedTheme) setTheme(savedTheme);
+  }, []);
+
+  // Fetch modelli quando cambia una API key
+  useEffect(() => {
+    const loadModels = async () => {
+      for (const provider of AI_PROVIDERS) {
+        const apiKey = apiKeys[provider.id];
+        if (provider.requiresApiKey && !apiKey) continue;
+        
+        // Evita di ricaricare se già abbiamo modelli per questo provider
+        if (availableModels[provider.id]?.length > 0) continue;
+        
+        setLoadingModels(prev => ({ ...prev, [provider.id]: true }));
+        try {
+          const models = await fetchModelsForProvider(provider.id, apiKey);
+          setAvailableModels(prev => ({ ...prev, [provider.id]: models }));
+          
+          // Se non c'è un modello selezionato e ci sono modelli, seleziona il primo
+          if (!selectedModels[provider.id] && models.length > 0) {
+            setSelectedModels(prev => ({ ...prev, [provider.id]: models[0].id }));
+          }
+        } catch (error) {
+          console.error(`Errore fetch modelli per ${provider.id}:`, error);
+        } finally {
+          setLoadingModels(prev => ({ ...prev, [provider.id]: false }));
+        }
+      }
+    };
+    
+    loadModels();
+  }, [apiKeys]);
 
   const t = LANGS[lang] || LANGS.en;
 
@@ -25,13 +81,93 @@ function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleAnalyze = () => {
+  const getSelectedModel = (providerId) => {
+    return selectedModels[providerId] || availableModels[providerId]?.[0]?.id || null;
+  };
+
+  const handleAnalyzeLog = async () => {
+    if (!logText.trim()) {
+      alert("Inserisci del testo da analizzare");
+      return;
+    }
+    
+    const apiKey = apiKeys[defaultProvider];
+    const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
+    if (provider?.requiresApiKey && !apiKey) {
+      alert(`Inserisci la API Key per ${provider.name} nelle impostazioni`);
+      setPage("settings");
+      return;
+    }
+    
     setAnalyzing(true);
     setShowResult(false);
-    setTimeout(() => {
-      setAnalyzing(false);
+    setAnalysisResult(null);
+    
+    try {
+      const serviceName = t.logAnalyzerPage.services[selectedService];
+      const prompt = buildLogAnalysisPrompt(logText, serviceName, systemProfile, lang);
+      const model = getSelectedModel(defaultProvider);
+      const response = await callAI(defaultProvider, apiKey, prompt, model);
+      
+      try {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const result = JSON.parse(jsonMatch[0]);
+          setAnalysisResult(result);
+        } else {
+          setAnalysisResult({ severity: "INFO", title: "Analisi", explanation: response, fix: "N/A" });
+        }
+      } catch {
+        setAnalysisResult({ severity: "INFO", title: "Risultato Analisi", explanation: response, fix: "N/A" });
+      }
       setShowResult(true);
-    }, 1800);
+    } catch (error) {
+      alert(`Errore: ${error.message}`);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleCraftCommand = async () => {
+    if (!cmdText.trim()) {
+      alert("Inserisci una descrizione");
+      return;
+    }
+    
+    const apiKey = apiKeys[defaultProvider];
+    const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
+    if (provider?.requiresApiKey && !apiKey) {
+      alert(`Inserisci la API Key per ${provider.name} nelle impostazioni`);
+      setPage("settings");
+      return;
+    }
+    
+    setAnalyzing(true);
+    setShowResult(false);
+    setCommandResult(null);
+    
+    try {
+      const prompt = buildCommandPrompt(cmdText, systemProfile, lang);
+      const model = getSelectedModel(defaultProvider);
+      const response = await callAI(defaultProvider, apiKey, prompt, model);
+      
+      try {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const result = JSON.parse(jsonMatch[0]);
+          setCommandResult(result);
+        } else {
+          setCommandResult({ command: response, explanation: "Comando generato" });
+        }
+      } catch {
+        setCommandResult({ command: response, explanation: "Comando generato" });
+      }
+      setShowResult(true);
+    } catch (error) {
+      alert(`Errore: ${error.message}`);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const navigateTo = (p, modeKey) => {
@@ -44,6 +180,17 @@ function App() {
     setShowResult(false);
     setAnalyzing(false);
     setSidebarOpen(false);
+  };
+
+  const saveSettings = () => {
+    localStorage.setItem("sysai_api_keys", JSON.stringify(apiKeys));
+    localStorage.setItem("sysai_selected_models", JSON.stringify(selectedModels));
+    localStorage.setItem("sysai_default_provider", defaultProvider);
+    localStorage.setItem("sysai_system_profile", systemProfile);
+    localStorage.setItem("sysai_lang", lang);
+    localStorage.setItem("sysai_theme", theme);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   const bg = theme === "dark" ? "#0B0E14" : "#F5F6F8";
@@ -86,9 +233,7 @@ function App() {
               background: `linear-gradient(135deg, ${accent}, #00A888)`,
               fontWeight: 700, fontSize: 14, color: "#0B0E14",
             }}>S</div>
-            <span style={{ fontWeight: 700, fontSize: 18 }}>
-              Sys<span style={{ color: accent }}>AI</span>
-            </span>
+            <span style={{ fontWeight: 700, fontSize: 18 }}>Sys<span style={{ color: accent }}>AI</span></span>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -103,12 +248,10 @@ function App() {
         </div>
       </nav>
 
-      {/* Sidebar Overlay */}
+      {/* Sidebar */}
       {sidebarOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex" }}>
-          <div onClick={() => setSidebarOpen(false)} style={{
-            position: "absolute", inset: 0, background: "#00000066",
-          }} />
+          <div onClick={() => setSidebarOpen(false)} style={{ position: "absolute", inset: 0, background: "#00000066" }} />
           <div style={{
             position: "relative", width: 280, background: surface, borderRight: `1px solid ${border}`,
             padding: "20px 0", display: "flex", flexDirection: "column",
@@ -182,19 +325,15 @@ function App() {
 
       {/* Main Content */}
       <main style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto", width: "100%" }}>
-        {/* HOME */}
+        {/* HOME uguale */}
         {page === "home" && (
           <div>
             <div style={{ textAlign: "center", marginBottom: 32 }}>
-              <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>
-                {t.tagline}
-              </h1>
+              <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8 }}>{t.tagline}</h1>
               <p style={{ color: text2, fontSize: 14 }}>
                 {lang === "it" ? "Scegli uno strumento per iniziare" : "Choose a tool to get started"}
               </p>
             </div>
-
-            {/* Search */}
             <div style={{ position: "relative", marginBottom: 24 }}>
               <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: text2 }}>⌕</span>
               <input
@@ -208,8 +347,6 @@ function App() {
                 }}
               />
             </div>
-
-            {/* Mode Cards Grid */}
             <div style={{
               display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12,
             }}>
@@ -254,7 +391,6 @@ function App() {
             </h2>
             <p style={{ color: text2, fontSize: 14, marginBottom: 20 }}>{t.logAnalyzerPage.subtitle}</p>
 
-            {/* Service Selector */}
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: text2, marginBottom: 8, display: "block" }}>
                 {t.logAnalyzerPage.serviceLabel}
@@ -272,7 +408,6 @@ function App() {
               </div>
             </div>
 
-            {/* Log Input */}
             <textarea
               value={logText}
               onChange={(e) => setLogText(e.target.value)}
@@ -285,51 +420,53 @@ function App() {
               }}
             />
 
-            <button onClick={handleAnalyze} style={{
+            <button onClick={handleAnalyzeLog} style={{
               marginTop: 12, padding: "12px 28px", background: accent, color: "#0B0E14",
               border: "none", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer",
             }}>
               {analyzing ? t.logAnalyzerPage.analyzing : t.logAnalyzerPage.analyze}
             </button>
 
-            {/* Result Demo */}
-            {showResult && (
+            {showResult && analysisResult && (
               <div style={{ marginTop: 24 }}>
                 <div style={{
                   display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px",
-                  borderRadius: 8, background: `${danger}15`, marginBottom: 16,
+                  borderRadius: 8, background: analysisResult.severity === "HIGH" || analysisResult.severity === "CRITICAL" ? `${danger}15` : `${accent}15`,
+                  marginBottom: 16,
                 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: danger }} />
-                  <span style={{ color: danger, fontWeight: 700, fontSize: 13 }}>HIGH</span>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: analysisResult.severity === "HIGH" || analysisResult.severity === "CRITICAL" ? danger : accent }} />
+                  <span style={{ color: analysisResult.severity === "HIGH" || analysisResult.severity === "CRITICAL" ? danger : accent, fontWeight: 700, fontSize: 13 }}>
+                    {analysisResult.severity || "INFO"}
+                  </span>
                 </div>
-                <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>SSH Brute Force Attack Detected</h3>
+                <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>{analysisResult.title}</h3>
                 <div style={{
                   background: surface, border: `1px solid ${border}`, borderRadius: 12,
                   padding: 20, marginBottom: 16,
                 }}>
-                  <p style={{ fontSize: 14, color: text2 }}>Multiple failed SSH login attempts for root user from external IP. This is a brute-force attack pattern.</p>
+                  <p style={{ fontSize: 14, color: text2, whiteSpace: "pre-wrap" }}>{analysisResult.explanation}</p>
                 </div>
-                <div style={{
-                  background: surface, border: `1px solid ${accent}33`, borderRadius: 12,
-                  overflow: "hidden",
-                }}>
+                {analysisResult.fix && analysisResult.fix !== "N/A" && (
                   <div style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px 16px", background: accentDim,
+                    background: surface, border: `1px solid ${accent}33`, borderRadius: 12,
+                    overflow: "hidden",
                   }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: accent }}>FIX</span>
-                    <button onClick={() => handleCopy("sudo ufw deny from 203.0.113.42")} style={{
-                      background: "none", border: `1px solid ${accent}44`, borderRadius: 6,
-                      color: accent, padding: "4px 12px", fontSize: 11, cursor: "pointer",
-                    }}>{copied ? "✓ Copied!" : "📋 Copy"}</button>
+                    <div style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "10px 16px", background: accentDim,
+                    }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: accent }}>FIX</span>
+                      <button onClick={() => handleCopy(analysisResult.fix)} style={{
+                        background: "none", border: `1px solid ${accent}44`, borderRadius: 6,
+                        color: accent, padding: "4px 12px", fontSize: 11, cursor: "pointer",
+                      }}>{copied ? "✓ Copied!" : "📋 Copy"}</button>
+                    </div>
+                    <pre style={{
+                      padding: 20, fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+                      color: text1, whiteSpace: "pre-wrap",
+                    }}>{analysisResult.fix}</pre>
                   </div>
-                  <pre style={{
-                    padding: 20, fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
-                    color: text1, whiteSpace: "pre-wrap",
-                  }}>sudo ufw deny from 203.0.113.42
-sudo sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-sudo systemctl restart sshd</pre>
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -358,7 +495,7 @@ sudo systemctl restart sshd</pre>
                   fontSize: 14,
                 }}
               />
-              <button onClick={handleAnalyze} style={{
+              <button onClick={handleCraftCommand} style={{
                 padding: "12px 24px", background: accent, color: "#0B0E14",
                 border: "none", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer",
               }}>
@@ -366,27 +503,36 @@ sudo systemctl restart sshd</pre>
               </button>
             </div>
 
-            {showResult && (
+            {showResult && commandResult && (
               <div style={{ marginTop: 24 }}>
                 <div style={{
                   background: surface, border: `1px solid ${accent}33`, borderRadius: 12,
-                  overflow: "hidden",
+                  overflow: "hidden", marginBottom: 16,
                 }}>
                   <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
                     padding: "10px 16px", background: accentDim,
                   }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: accent }}>COMMAND</span>
-                    <button onClick={() => handleCopy("find / -type f -size +100M -mtime -7")} style={{
+                    <button onClick={() => handleCopy(commandResult.command)} style={{
                       background: "none", border: `1px solid ${accent}44`, borderRadius: 6,
                       color: accent, padding: "4px 12px", fontSize: 11, cursor: "pointer",
                     }}>{copied ? "✓ Copied!" : "📋 Copy"}</button>
                   </div>
                   <pre style={{
                     padding: 20, fontFamily: "'JetBrains Mono', monospace", fontSize: 14,
-                    color: accent, fontWeight: 600,
-                  }}>find / -type f -size +100M -mtime -7</pre>
+                    color: accent, fontWeight: 600, overflowX: "auto",
+                  }}>{commandResult.command}</pre>
                 </div>
+                {commandResult.explanation && (
+                  <div style={{
+                    background: surface, border: `1px solid ${border}`, borderRadius: 12,
+                    padding: 20,
+                  }}>
+                    <h4 style={{ fontSize: 13, fontWeight: 600, color: text2, marginBottom: 12 }}>📖 Explanation</h4>
+                    <p style={{ fontSize: 14, color: text2, whiteSpace: "pre-wrap" }}>{commandResult.explanation}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -400,6 +546,81 @@ sudo systemctl restart sshd</pre>
               fontSize: 13, marginBottom: 16,
             }}>← {t.home}</button>
             <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>⚙ {t.settingsPage.title}</h2>
+
+            {/* AI Providers */}
+            <div style={{
+              background: surface, border: `1px solid ${border}`, borderRadius: 16,
+              padding: 24, marginBottom: 16,
+            }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: text2, marginBottom: 16 }}>
+                🤖 {t.settingsPage.apiProviders}
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {AI_PROVIDERS.map((provider) => {
+                  const models = availableModels[provider.id] || [];
+                  const isLoading = loadingModels[provider.id];
+                  return (
+                    <div key={provider.id} style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
+                      borderRadius: 12, background: surface2, border: `1px solid ${border}`,
+                      flexWrap: "wrap",
+                    }}>
+                      <span style={{ color: provider.color, fontSize: 20, minWidth: 24 }}>{provider.icon}</span>
+                      <span style={{ fontWeight: 600, fontSize: 14, minWidth: 140 }}>{provider.name}</span>
+                      {provider.requiresApiKey ? (
+                        <input
+                          placeholder={t.settingsPage.apiKey}
+                          type="password"
+                          value={apiKeys[provider.id] || ""}
+                          onChange={(e) => setApiKeys({ ...apiKeys, [provider.id]: e.target.value })}
+                          style={{
+                            flex: 1, minWidth: 160, padding: "8px 12px", borderRadius: 8,
+                            background: bg, border: `1px solid ${border}`, color: text1,
+                            fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: 12, color: text2, flex: 1, minWidth: 160 }}>🔓 No API key required (local)</span>
+                      )}
+                      
+                      {/* Modelli a tendina - caricati dinamicamente */}
+                      {isLoading ? (
+                        <span style={{ fontSize: 12, color: text2, minWidth: 160 }}>⏳ Caricamento modelli...</span>
+                      ) : models.length > 0 ? (
+                        <select
+                          value={selectedModels[provider.id] || models[0]?.id || ""}
+                          onChange={(e) => setSelectedModels({ ...selectedModels, [provider.id]: e.target.value })}
+                          style={{
+                            padding: "6px 10px", borderRadius: 8, fontSize: 12,
+                            background: bg, border: `1px solid ${border}`, color: text1,
+                            cursor: "pointer", minWidth: 180,
+                          }}
+                        >
+                          {models.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                          ))}
+                        </select>
+                      ) : provider.requiresApiKey && apiKeys[provider.id] ? (
+                        <span style={{ fontSize: 12, color: danger, minWidth: 180 }}>⚠️ Nessun modello trovato</span>
+                      ) : (
+                        <span style={{ fontSize: 12, color: text2, minWidth: 180 }}>🔑 Inserisci API key</span>
+                      )}
+                      
+                      <button
+                        onClick={() => setDefaultProvider(provider.id)}
+                        style={{
+                          padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                          background: defaultProvider === provider.id ? accent : "transparent",
+                          color: defaultProvider === provider.id ? "#0B0E14" : text2,
+                          border: `1px solid ${defaultProvider === provider.id ? accent : border}`,
+                          cursor: "pointer", whiteSpace: "nowrap",
+                        }}
+                      >{t.settingsPage.setDefault}</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Language & Theme */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
@@ -438,7 +659,26 @@ sudo systemctl restart sshd</pre>
               </div>
             </div>
 
-            <button onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2000); }} style={{
+            {/* System Profile */}
+            <div style={{
+              background: surface, border: `1px solid ${border}`, borderRadius: 16,
+              padding: 24, marginBottom: 16,
+            }}>
+              <h3 style={{ fontSize: 13, fontWeight: 600, color: text2, marginBottom: 12 }}>{t.settingsPage.systemProfile}</h3>
+              <textarea
+                value={systemProfile}
+                onChange={(e) => setSystemProfile(e.target.value)}
+                placeholder={t.settingsPage.systemProfilePlaceholder}
+                style={{
+                  width: "100%", height: 80, padding: 12, borderRadius: 10,
+                  background: surface2, border: `1px solid ${border}`, color: text1,
+                  fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            <button onClick={saveSettings} style={{
               padding: "12px 28px", background: accent, color: "#0B0E14",
               border: "none", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer",
             }}>
@@ -447,7 +687,7 @@ sudo systemctl restart sshd</pre>
           </div>
         )}
 
-        {/* Placeholder for PRO pages */}
+        {/* Placeholder for other PRO pages */}
         {["configGenerator", "troubleshooter", "scriptBuilder", "securityAuditor", "history", "favorites", "snippets", "explainMode"].includes(page) && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
