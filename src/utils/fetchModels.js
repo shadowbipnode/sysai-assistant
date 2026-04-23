@@ -10,9 +10,9 @@ export const fetchGeminiModels = async (apiKey) => {
     if (data.models) {
       return data.models
         .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
-        .filter(m => m.name.includes('gemini'))  // solo modelli Gemini, non Gemma
+        .filter(m => m.name.includes('gemini'))
         .map(m => ({
-          id: m.name.replace('models/', ''),  // es: "gemini-2.5-flash"
+          id: m.name.replace('models/', ''),
           name: m.displayName || m.name.replace('models/', '')
         }));
     }
@@ -44,7 +44,6 @@ export const fetchOpenAIModels = async (apiKey) => {
 
 // Funzione per ottenere i modelli di DeepSeek
 export const fetchDeepSeekModels = async (apiKey) => {
-  // DeepSeek ha solo pochi modelli
   return [
     { id: "deepseek-chat", name: "DeepSeek Chat" },
     { id: "deepseek-coder", name: "DeepSeek Coder" },
@@ -68,7 +67,7 @@ export const fetchMistralModels = async (apiKey) => {
   }
 };
 
-// Funzione per ottenere i modelli di Claude
+// Funzione per ottenere i modelli di Claude (Anthropic) - modelli aggiornati al 2026
 export const fetchClaudeModels = async (apiKey) => {
   try {
     const response = await fetch("https://api.anthropic.com/v1/models", {
@@ -78,13 +77,35 @@ export const fetchClaudeModels = async (apiKey) => {
       }
     });
     const data = await response.json();
-    if (data.data) {
-      return data.data.map(m => ({ id: m.id, name: m.display_name || m.id }));
+    if (data.data && Array.isArray(data.data)) {
+      return data.data.map(m => ({
+        id: m.id,
+        name: m.display_name || m.id
+      }));
     }
-    return [];
+    // Fallback con modelli aggiornati al 2026
+    return [
+      { id: "claude-opus-4-7", name: "Claude Opus 4.7 (flagship, Apr 2026)" },
+      { id: "claude-opus-4-6", name: "Claude Opus 4.6 (Feb 2026)" },
+      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6 (default, Feb 2026)" },
+      { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5 (Sep 2025)" },
+      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5 (Oct 2025)" },
+      { id: "claude-3-7-sonnet-20250219", name: "Claude 3.7 Sonnet (extended thinking)" },
+      { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku" },
+      { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet v2" },
+      { id: "claude-3-opus-20240229", name: "Claude 3 Opus (legacy)" },
+    ];
   } catch (error) {
     console.error("Errore fetch modelli Claude:", error);
-    return [];
+    return [
+      { id: "claude-opus-4-7", name: "Claude Opus 4.7 (flagship, Apr 2026)" },
+      { id: "claude-opus-4-6", name: "Claude Opus 4.6 (Feb 2026)" },
+      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6 (default, Feb 2026)" },
+      { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5 (Sep 2025)" },
+      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5 (Oct 2025)" },
+      { id: "claude-3-7-sonnet-20250219", name: "Claude 3.7 Sonnet" },
+      { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku" },
+    ];
   }
 };
 
