@@ -52,6 +52,7 @@ Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
 };
 
 // Prompt per generare comandi
+export const buildConfigPrompt = buildConfigPromptFn;
 
 export const buildCommandPrompt = (description, systemProfile, lang) => {
   const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
@@ -99,3 +100,5 @@ Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
 }`;
 };
 
+// Esporta buildConfigPrompt
+export { buildConfigPrompt };

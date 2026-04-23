@@ -220,6 +220,7 @@ function App() {
           </div>
         </div>
         
+        {/* Provider e modello in uso */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
             display: "flex", alignItems: "center", gap: 6,
@@ -244,7 +245,7 @@ function App() {
         </div>
       </nav>
 
-      {/* Sidebar */}
+      {/* Sidebar (uguale) */}
       {sidebarOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex" }}>
           <div onClick={() => setSidebarOpen(false)} style={{ position: "absolute", inset: 0, background: "#00000066" }} />
@@ -352,16 +353,7 @@ function App() {
           </div>
         )}
 
-        {page === "logAnalyzer" && (
-          <LogAnalyzer t={t} onAnalyze={handleAnalyzeLog} onBack={() => setPage("home")} />
-        )}
 
-        {page === "commandCrafter" && (
-          <CommandCrafter t={t} onCraft={handleCraftCommand} onBack={() => setPage("home")} />
-        )}
-
-        {page === "configGenerator" && (
-          <ConfigGenerator t={t} onGenerate={handleGenerateConfig} onBack={() => setPage("home")} />
         )}
 
         {page === "settings" && (
@@ -396,8 +388,7 @@ function App() {
           />
         )}
 
-        {/* Placeholder per altre pagine Pro */}
-        {["troubleshooter", "scriptBuilder", "securityAuditor", "history", "favorites", "snippets", "explainMode"].includes(page) && (
+        {["configGenerator", "troubleshooter", "scriptBuilder", "securityAuditor", "history", "favorites", "snippets", "explainMode"].includes(page) && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48 }}>🔒</div>
             <h2>Pro Feature</h2>
@@ -407,6 +398,6 @@ function App() {
       </main>
     </div>
   );
-};
+}
 
 export default App;
