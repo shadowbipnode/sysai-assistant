@@ -99,3 +99,52 @@ Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
 }`;
 };
 
+
+// Prompt per troubleshooting (genera domande)
+export const buildTroubleshootQuestionsPrompt = (problem, systemProfile, lang) => {
+  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
+  const targetLang = languageMap[lang] || "english";
+  
+  return `Sei un esperto sysadmin Linux. Fai una diagnosi guidata per il seguente problema. Rispondi SOLO in ${targetLang}.
+
+CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
+
+PROBLEMA: ${problem}
+
+Genera 3-5 domande specifiche (a risposta multipla con 3-4 opzioni ciascuna) per identificare la causa root.
+
+Rispondi STRETTAMENTE con questo formato JSON:
+{
+  "questions": [
+    { "text": "domanda 1", "options": ["opzione A", "opzione B", "opzione C"] },
+    { "text": "domanda 2", "options": ["opzione X", "opzione Y", "opzione Z"] }
+  ]
+}`;
+};
+
+// Prompt per troubleshooting (genera soluzione basata sulle risposte)
+export const buildTroubleshootSolutionPrompt = (problem, answers, questions, systemProfile, lang) => {
+  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
+  const targetLang = languageMap[lang] || "english";
+  
+  // Costruisce il contesto delle risposte
+  let qaContext = "";
+  for (let i = 0; i < questions.length; i++) {
+    qaContext += `\nQ${i+1}: ${questions[i].text}\nA: ${answers[i]}\n`;
+  }
+  
+  return `Sei un esperto sysadmin Linux. Basandoti sulle risposte fornite, identifica la soluzione al problema. Rispondi SOLO in ${targetLang}.
+
+CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
+
+PROBLEMA ORIGINALE: ${problem}
+
+DIAGNOSI:
+${qaContext}
+
+Rispondi STRETTAMENTE con questo formato JSON:
+{
+  "explanation": "spiegazione della causa root e dei passaggi per risolverlo",
+  "fix": "comandi Linux da eseguire per risolvere (uno per riga)"
+}`;
+};

@@ -10,6 +10,7 @@ import CommandCrafter from "./components/CommandCrafter";
 import Settings from "./components/Settings";
 import ConfigGenerator from "./components/ConfigGenerator";
 import Troubleshooter from "./components/Troubleshooter";
+
 function App() {
   const [lang, setLang] = useState("en");
   const [theme, setTheme] = useState("dark");
@@ -134,7 +135,6 @@ function App() {
     }
   };
 
-  
   const handleTroubleshoot = async (problem, action, answers = [], questions = []) => {
     const apiKey = apiKeys[defaultProvider];
     const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
@@ -145,20 +145,25 @@ function App() {
     }
     
     try {
-      let prompt;
+      let prompt, response;
       if (action === "start") {
         prompt = buildTroubleshootQuestionsPrompt(problem, systemProfile, lang);
       } else {
         prompt = buildTroubleshootSolutionPrompt(problem, answers, questions, systemProfile, lang);
       }
       const model = getCurrentModel();
-      const response = await callAI(defaultProvider, apiKey, prompt, model);
+      response = await callAI(defaultProvider, apiKey, prompt, model);
       
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
-        showToast(action === "start" ? "Domande generate!" : "Soluzione trovata!", "success");
-        return result;
+        if (action === "start") {
+          showToast("Domande generate!", "success");
+          return result;
+        } else {
+          showToast("Soluzione trovata!", "success");
+          return result;
+        }
       }
       return null;
     } catch (error) {
@@ -166,6 +171,8 @@ function App() {
       return null;
     }
   };
+
+
 
   const handleCraftCommand = async (cmdText) => {
     const apiKey = apiKeys[defaultProvider];
@@ -393,11 +400,19 @@ function App() {
         )}
 
         {page === "configGenerator" && (
-          <ConfigGenerator t={t} onGenerate={handleGenerateConfig} onBack={() => setPage("home")} />
-        )}
+
         {page === "troubleshooter" && (
           <Troubleshooter t={t} onDiagnose={handleTroubleshoot} onBack={() => setPage("home")} />
         )}
+
+          <ConfigGenerator t={t} onGenerate={handleGenerateConfig} onBack={() => setPage("home")} />
+
+        {page === "troubleshooter" && (
+          <Troubleshooter t={t} onDiagnose={handleTroubleshoot} onBack={() => setPage("home")} />
+        )}
+
+        )}
+
         {page === "settings" && (
           <Settings
             t={t}
