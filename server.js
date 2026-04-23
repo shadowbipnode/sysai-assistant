@@ -15,11 +15,10 @@ app.get('/health', (req, res) => {
 app.post('/api/gemini', async (req, res) => {
   try {
     const { apiKey, model, prompt } = req.body;
+    console.log(`[Gemini] Calling model: ${model}`);
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }]
-      },
+      { contents: [{ parts: [{ text: prompt }] }] },
       { headers: { 'Content-Type': 'application/json' } }
     );
     const text = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -36,11 +35,7 @@ app.post('/api/openai', async (req, res) => {
     const { apiKey, model, prompt } = req.body;
     const response = await axios.post(
       'https://api.openai.com/v1/chat/completions',
-      {
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7
-      },
+      { model, messages: [{ role: 'user', content: prompt }], temperature: 0.7 },
       { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
     );
     const text = response.data.choices?.[0]?.message?.content || '';
@@ -57,18 +52,8 @@ app.post('/api/claude', async (req, res) => {
     const { apiKey, model, prompt } = req.body;
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
-      {
-        model,
-        max_tokens: 4096,
-        messages: [{ role: 'user', content: prompt }]
-      },
-      {
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json'
-        }
-      }
+      { model, max_tokens: 4096, messages: [{ role: 'user', content: prompt }] },
+      { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' } }
     );
     const text = response.data.content?.[0]?.text || '';
     res.json({ text });
@@ -78,17 +63,13 @@ app.post('/api/claude', async (req, res) => {
   }
 });
 
-// Proxy per DeepSeek (API compatibile OpenAI)
+// Proxy per DeepSeek
 app.post('/api/deepseek', async (req, res) => {
   try {
     const { apiKey, model, prompt } = req.body;
     const response = await axios.post(
       'https://api.deepseek.com/v1/chat/completions',
-      {
-        model: model || 'deepseek-chat',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7
-      },
+      { model: model || 'deepseek-chat', messages: [{ role: 'user', content: prompt }], temperature: 0.7 },
       { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
     );
     const text = response.data.choices?.[0]?.message?.content || '';
@@ -105,11 +86,7 @@ app.post('/api/mistral', async (req, res) => {
     const { apiKey, model, prompt } = req.body;
     const response = await axios.post(
       'https://api.mistral.ai/v1/chat/completions',
-      {
-        model: model || 'mistral-tiny',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7
-      },
+      { model: model || 'mistral-tiny', messages: [{ role: 'user', content: prompt }], temperature: 0.7 },
       { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' } }
     );
     const text = response.data.choices?.[0]?.message?.content || '';
@@ -120,7 +97,7 @@ app.post('/api/mistral', async (req, res) => {
   }
 });
 
-// Proxy per Ollama (locale)
+// Proxy per Ollama
 app.post('/api/ollama', async (req, res) => {
   try {
     const { model, prompt, baseURL = 'http://localhost:11434' } = req.body;

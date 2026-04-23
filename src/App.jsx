@@ -93,6 +93,7 @@ function App() {
       const prompt = buildLogAnalysisPrompt(logText, serviceName, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
+      console.log("🤖 AI response:", response.substring(0, 200));
       
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -120,6 +121,7 @@ function App() {
       const prompt = buildConfigPrompt(configType, description, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
+      console.log("🤖 AI response:", response.substring(0, 200));
       
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -153,6 +155,7 @@ function App() {
       }
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
+      console.log("🤖 AI response:", response.substring(0, 200));
       
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -180,6 +183,7 @@ function App() {
       const prompt = buildCommandPrompt(cmdText, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
+      console.log("🤖 AI response:", response.substring(0, 200));
       
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -431,7 +435,7 @@ function App() {
         )}
 
         {/* Placeholder per altre pagine Pro */}
-        {["troubleshooter", "scriptBuilder", "securityAuditor", "history", "favorites", "snippets", "explainMode"].includes(page) && (
+        {["scriptBuilder", "securityAuditor", "history", "favorites", "snippets", "explainMode"].includes(page) && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48 }}>🔒</div>
             <h2>Pro Feature</h2>

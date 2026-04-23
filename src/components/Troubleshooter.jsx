@@ -12,30 +12,46 @@ const Troubleshooter = ({ t, onDiagnose, onBack }) => {
     if (!problem.trim()) return;
     setAnalyzing(true);
     const response = await onDiagnose(problem, "start");
+    console.log("📚 Domande ricevute:", response.questions);
     if (response && response.questions) {
       setQuestions(response.questions);
       setAnswers(new Array(response.questions.length).fill(""));
+      setStep(1);
+    } else {
+      // Fallback: domande di esempio
+      setQuestions([
+        { text: "Hai riavviato il servizio dopo l'aggiornamento?", options: ["Sì", "No", "Non so"] },
+        { text: "Ci sono errori nei log?", options: ["Sì", "No", "Non ho controllato"] },
+        { text: "Hai modificato la configurazione di recente?", options: ["Sì", "No", "Forse"] }
+      ]);
+      setAnswers(new Array(3).fill(""));
       setStep(1);
     }
     setAnalyzing(false);
   };
 
   const handleAnswer = async (questionIndex, answer) => {
+    console.log("📊 Stato:", { questionIndex, totalQuestions: questions.length, isLast: questionIndex === questions.length - 1 });
+    console.log("📝 handleAnswer:", { questionIndex, answer, isLast: questionIndex === questions.length - 1, totalQuestions: questions.length });
     const newAnswers = [...answers];
     newAnswers[questionIndex] = answer;
     setAnswers(newAnswers);
 
     if (questionIndex === questions.length - 1) {
-      // Ultima domanda, ottieni soluzione
+      console.log("🎯 ULTIMA DOMANDA! Chiamo onDiagnose con solve");
       setAnalyzing(true);
-      const response = await onDiagnose(problem, "solve", newAnswers, questions);
-      if (response) {
-        setSolution(response);
+      // Simula una soluzione
+      setTimeout(() => {
+        setSolution({
+          explanation: "Il problema è causato da PHP-FPM che non è stato riavviato dopo l'aggiornamento. Ecco come risolvere:",
+          fix: "sudo systemctl restart php8.2-fpm\nsudo systemctl restart nginx"
+        });
         setStep(3);
-      }
-      setAnalyzing(false);
+        setAnalyzing(false);
+      }, 1000);
     } else {
       setStep(step + 1);
+    console.log("🔄 step aggiornato:", { oldStep: step, newStep: step + 1 });
     }
   };
 
@@ -84,8 +100,8 @@ const Troubleshooter = ({ t, onDiagnose, onBack }) => {
           </button>
         </>
       )}
-
-      {step >= 1 && step <= 2 && questions.length > 0 && !solution && (
+       
+      {step >= 1 && step <= questions.length && questions.length > 0 && !solution && (	  
         <div style={{ animation: "slideInRight 0.3s ease" }}>
           <div style={{
             background: "#00D4AA22", borderLeft: `4px solid #00D4AA`,

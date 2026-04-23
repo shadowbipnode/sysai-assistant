@@ -99,25 +99,24 @@ Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
 }`;
 };
 
-
 // Prompt per troubleshooting (genera domande)
 export const buildTroubleshootQuestionsPrompt = (problem, systemProfile, lang) => {
   const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
   const targetLang = languageMap[lang] || "english";
   
-  return `Sei un esperto sysadmin Linux. Fai una diagnosi guidata per il seguente problema. Rispondi SOLO in ${targetLang}.
-
-CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
+  return `Sei un esperto sysadmin Linux. Fai una diagnosi guidata. Rispondi SOLO in ${targetLang}.
 
 PROBLEMA: ${problem}
+CONTESTO: ${systemProfile || "Non specificato"}
 
-Genera 3-5 domande specifiche (a risposta multipla con 3-4 opzioni ciascuna) per identificare la causa root.
+Genera 3 domande specifiche CIASCUNA con 3-4 opzioni SEMPLICI (stringhe, non oggetti).
 
-Rispondi STRETTAMENTE con questo formato JSON:
+Formato ESATTO della risposta (solo JSON, nient'altro):
 {
   "questions": [
-    { "text": "domanda 1", "options": ["opzione A", "opzione B", "opzione C"] },
-    { "text": "domanda 2", "options": ["opzione X", "opzione Y", "opzione Z"] }
+    { "text": "Prima domanda?", "options": ["Opzione A", "Opzione B", "Opzione C"] },
+    { "text": "Seconda domanda?", "options": ["Opzione X", "Opzione Y", "Opzione Z"] },
+    { "text": "Terza domanda?", "options": ["Opzione 1", "Opzione 2", "Opzione 3"] }
   ]
 }`;
 };
@@ -126,13 +125,13 @@ Rispondi STRETTAMENTE con questo formato JSON:
 export const buildTroubleshootSolutionPrompt = (problem, answers, questions, systemProfile, lang) => {
   const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
   const targetLang = languageMap[lang] || "english";
-  
+
   // Costruisce il contesto delle risposte
   let qaContext = "";
   for (let i = 0; i < questions.length; i++) {
     qaContext += `\nQ${i+1}: ${questions[i].text}\nA: ${answers[i]}\n`;
   }
-  
+
   return `Sei un esperto sysadmin Linux. Basandoti sulle risposte fornite, identifica la soluzione al problema. Rispondi SOLO in ${targetLang}.
 
 CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
