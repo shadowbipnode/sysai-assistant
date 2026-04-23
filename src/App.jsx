@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import LANGS, { FREE_MODES } from "./i18n";
-import { AI_PROVIDERS, callAI, buildLogAnalysisPrompt, buildCommandPrompt, buildConfigPrompt, buildTroubleshootQuestionsPrompt, buildTroubleshootSolutionPrompt } from "./utils/aiProviders";
+import { AI_PROVIDERS, callAI, buildLogAnalysisPrompt, buildCommandPrompt, buildConfigPrompt, buildTroubleshootQuestionsPrompt, buildTroubleshootSolutionPrompt, buildScriptPrompt, buildSecurityAuditPrompt } from "./utils/aiProviders";
 import { fetchModelsForProvider } from "./utils/fetchModels";
 import Toast from "./components/Toast";
 import { useToast } from "./hooks/useToast";
@@ -10,6 +10,8 @@ import CommandCrafter from "./components/CommandCrafter";
 import Settings from "./components/Settings";
 import ConfigGenerator from "./components/ConfigGenerator";
 import Troubleshooter from "./components/Troubleshooter";
+import ScriptBuilder from "./components/ScriptBuilder";
+import SecurityAuditor from "./components/SecurityAuditor";
 function App() {
   const [lang, setLang] = useState("en");
   const [theme, setTheme] = useState("dark");
@@ -170,6 +172,59 @@ function App() {
     }
   };
 
+  const handleGenerateScript = async (scriptType, description) => {
+    const apiKey = apiKeys[defaultProvider];
+    const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
+    if (provider?.requiresApiKey && !apiKey) {
+      showToast(`Inserisci API Key per ${provider.name}`, "error");
+      setPage("settings");
+      return null;
+    }
+    
+    try {
+      const prompt = buildScriptPrompt(scriptType, description, systemProfile, lang);
+      const model = getCurrentModel();
+      const response = await callAI(defaultProvider, apiKey, prompt, model);
+      
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        showToast("Script generato!", "success");
+        return result;
+      }
+      return { filename: "script.sh", script: response, explanation: "Script generato" };
+    } catch (error) {
+      showToast(`Errore: ${error.message}`, "error");
+      return null;
+    }
+  };
+
+  const handleSecurityAudit = async (inputType, sourceText) => {
+    const apiKey = apiKeys[defaultProvider];
+    const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
+    if (provider?.requiresApiKey && !apiKey) {
+      showToast(`Inserisci API Key per ${provider.name}`, "error");
+      setPage("settings");
+      return null;
+    }
+    
+    try {
+      const prompt = buildSecurityAuditPrompt(inputType, sourceText, systemProfile, lang);
+      const model = getCurrentModel();
+      const response = await callAI(defaultProvider, apiKey, prompt, model);
+      
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        showToast("Analisi sicurezza completata!", "success");
+        return result;
+      }
+      return { report: response, recommendations: "Verifica manuale consigliata" };
+    } catch (error) {
+      showToast(`Errore: ${error.message}`, "error");
+      return null;
+    }
+  };
   const handleCraftCommand = async (cmdText) => {
     const apiKey = apiKeys[defaultProvider];
     const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
@@ -402,6 +457,12 @@ function App() {
         {page === "troubleshooter" && (
           <Troubleshooter t={t} onDiagnose={handleTroubleshoot} onBack={() => setPage("home")} />
         )}
+	{page === "scriptBuilder" && (
+          <ScriptBuilder t={t} onGenerate={handleGenerateScript} onBack={() => setPage("home")} />
+        )}
+	{page === "securityAuditor" && (
+          <SecurityAuditor t={t} onAudit={handleSecurityAudit} onBack={() => setPage("home")} />
+        )}
         {page === "settings" && (
           <Settings
             t={t}
@@ -435,7 +496,7 @@ function App() {
         )}
 
         {/* Placeholder per altre pagine Pro */}
-        {["scriptBuilder", "securityAuditor", "history", "favorites", "snippets", "explainMode"].includes(page) && (
+	{["scriptBuilder", "history", "favorites", "snippets", "explainMode"].includes(page) && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48 }}>🔒</div>
             <h2>Pro Feature</h2>

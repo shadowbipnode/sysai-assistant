@@ -147,3 +147,50 @@ Rispondi STRETTAMENTE con questo formato JSON:
   "fix": "comandi Linux da eseguire per risolvere (uno per riga)"
 }`;
 };
+
+// Prompt per generare script
+export const buildScriptPrompt = (scriptType, description, systemProfile, lang) => {
+  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
+  const targetLang = languageMap[lang] || "english";
+  
+  let filename = "";
+  switch(scriptType.toLowerCase()) {
+    case "bash": filename = "script.sh"; break;
+    case "python": filename = "script.py"; break;
+    case "powershell": filename = "script.ps1"; break;
+    case "node.js": filename = "script.js"; break;
+    default: filename = "script.sh";
+  }
+  
+  return `Sei un esperto sysadmin Linux. Genera uno script ${scriptType} professionale, ben commentato e con error handling. Rispondi SOLO in ${targetLang}.
+
+CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
+
+REQUISITI: ${description}
+
+Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
+{
+  "filename": "${filename}",
+  "script": "il contenuto completo dello script con commenti in linea e error handling",
+  "explanation": "spiegazione di cosa fa lo script e come eseguirlo"
+}`;
+};
+
+// Prompt per security auditor
+export const buildSecurityAuditPrompt = (inputType, sourceText, systemProfile, lang) => {
+  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
+  const targetLang = languageMap[lang] || "english";
+  
+  return `Sei un esperto di cybersecurity. Analizza la seguente configurazione o descrizione e fornisci un report di sicurezza. Rispondi SOLO in ${targetLang}.
+
+CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
+
+TIPO INPUT: ${inputType}
+CONTENUTO: ${sourceText}
+
+Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
+{
+  "report": "Analisi dettagliata dei problemi di sicurezza trovati, con spiegazione dei rischi",
+  "recommendations": "Raccomandazioni specifiche per risolvere ogni problema, con comandi dove necessario"
+}`;
+};
