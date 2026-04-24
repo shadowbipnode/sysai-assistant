@@ -1,222 +1,298 @@
-// Provider AI disponibili
+/**
+ * SysAI - AI Provider Configuration & Prompt Engineering
+ * 
+ * Tutte le chiamate passano dal proxy locale (server.js su :3001).
+ * Le API key non escono mai dal processo locale.
+ */
+
+const PROXY_BASE = 'http://127.0.0.1:3001';
+
+// ============================================================
+// PROVIDER DEFINITIONS
+// ============================================================
 export const AI_PROVIDERS = [
-  { id: "gemini", name: "Google Gemini", color: "#4285F4", icon: "◆", requiresApiKey: true, defaultModel: "gemini-2.0-flash-exp" },
-  { id: "openai", name: "OpenAI GPT", color: "#10A37F", icon: "◉", requiresApiKey: true, defaultModel: "gpt-4o-mini" },
-  { id: "claude", name: "Anthropic Claude", color: "#D97706", icon: "◈", requiresApiKey: true, defaultModel: "claude-3-5-haiku-20241022" },
-  { id: "deepseek", name: "DeepSeek", color: "#5B6CF0", icon: "◎", requiresApiKey: true, defaultModel: "deepseek-chat" },
-  { id: "mistral", name: "Mistral AI", color: "#F97316", icon: "◇", requiresApiKey: true, defaultModel: "mistral-tiny" },
-  { id: "ollama", name: "Ollama (Locale)", color: "#6B7280", icon: "○", requiresApiKey: false, defaultModel: "llama3.2" },
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    color: '#4285F4',
+    icon: '◆',
+    requiresApiKey: true,
+    defaultModel: 'gemini-2.0-flash',
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI GPT',
+    color: '#10A37F',
+    icon: '◉',
+    requiresApiKey: true,
+    defaultModel: 'gpt-4o-mini',
+  },
+  {
+    id: 'claude',
+    name: 'Anthropic Claude',
+    color: '#D97706',
+    icon: '◈',
+    requiresApiKey: true,
+    defaultModel: 'claude-sonnet-4-20250514',
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    color: '#5B6CF0',
+    icon: '◎',
+    requiresApiKey: true,
+    defaultModel: 'deepseek-chat',
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral AI',
+    color: '#F97316',
+    icon: '◇',
+    requiresApiKey: true,
+    defaultModel: 'mistral-small-latest',
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama (Locale)',
+    color: '#6B7280',
+    icon: '○',
+    requiresApiKey: false,
+    defaultModel: 'llama3.2',
+  },
 ];
 
-// Funzione principale per chiamare qualsiasi AI via proxy
-export const callAI = async (providerId, apiKey, prompt, model) => {
+// ============================================================
+// CALL AI VIA PROXY
+// ============================================================
+export async function callAI(providerId, apiKey, prompt, model) {
   const provider = AI_PROVIDERS.find(p => p.id === providerId);
-  if (!provider) throw new Error(`Provider ${providerId} non trovato`);
+  if (!provider) throw new Error(`Provider "${providerId}" non trovato`);
   if (provider.requiresApiKey && !apiKey) throw new Error(`API Key mancante per ${provider.name}`);
 
-  const response = await fetch(`http://localhost:3001/api/${providerId}`, {
+  const body = {
+    apiKey,
+    model: model || provider.defaultModel,
+    prompt,
+  };
+
+  const response = await fetch(`${PROXY_BASE}/api/${providerId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      apiKey: apiKey || '',
-      model: model || provider.defaultModel,
-      prompt: prompt
-    })
+    body: JSON.stringify(body),
   });
 
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Errore chiamata API');
+
+  if (!response.ok) {
+    throw new Error(data.error || `Errore ${response.status} da ${provider.name}`);
+  }
+
   return data.text;
-};
+}
 
-// Prompt per analisi log
-export const buildLogAnalysisPrompt = (logText, service, systemProfile, lang) => {
-  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
-  const targetLang = languageMap[lang] || "english";
-  
-  return `Sei un esperto sysadmin Linux. Analizza il seguente log e rispondi SOLO in ${targetLang}.
+// ============================================================
+// FETCH MODELS VIA PROXY
+// ============================================================
+export async function fetchModels(providerId, apiKey, baseURL) {
+  try {
+    const body = { apiKey, baseURL };
+    const response = await fetch(`${PROXY_BASE}/api/models/${providerId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    return data.models || [];
+  } catch (error) {
+    console.error(`Errore fetch modelli ${providerId}:`, error);
+    return [];
+  }
+}
 
-CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
-SERVIZIO: ${service}
+// ============================================================
+// SYSTEM PROMPT BASE (usato da tutti i tool)
+// ============================================================
+function getSystemContext(systemProfile, lang) {
+  const langMap = { it: 'italiano', fr: 'français', de: 'deutsch', es: 'español', en: 'english' };
+  const targetLang = langMap[lang] || 'english';
 
-LOG DA ANALIZZARE:
+  return `You are an expert Linux system administrator and security specialist.
+You have 20+ years of experience with Linux servers, networking, security hardening, and troubleshooting.
+
+LANGUAGE: Respond ONLY in ${targetLang}.
+SYSTEM CONTEXT: ${systemProfile || 'Not specified - assume Ubuntu/Debian with standard services.'}
+
+RESPONSE RULES:
+- Be precise and actionable
+- Always provide exact commands, not generic advice
+- Include command explanations with comments
+- Flag any destructive commands with warnings
+- Consider the system context when giving recommendations`;
+}
+
+// ============================================================
+// SPECIALIZED PROMPTS PER TOOL
+// ============================================================
+
+export function buildLogAnalysisPrompt(logText, service, systemProfile, lang) {
+  const systemContext = getSystemContext(systemProfile, lang);
+
+  return `${systemContext}
+
+TASK: Analyze the following system log and identify issues.
+
+SERVICE: ${service}
+LOG:
+\`\`\`
 ${logText}
+\`\`\`
 
-Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
+Respond STRICTLY with this JSON format (no other text before or after):
 {
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
-  "title": "Breve titolo del problema",
-  "explanation": "Spiegazione dettagliata del problema e causa root",
-  "fix": "Comandi Linux per risolvere il problema (uno per riga)"
+  "title": "Brief title of the issue found",
+  "explanation": "Detailed explanation of the problem, root cause analysis, and potential impact",
+  "fix": "Step-by-step fix commands (one per line, with # comments explaining each step)",
+  "prevention": "How to prevent this in the future (1-2 sentences)"
 }`;
-};
+}
 
-// Prompt per generare comandi
+export function buildCommandPrompt(description, systemProfile, lang) {
+  const systemContext = getSystemContext(systemProfile, lang);
 
-export const buildCommandPrompt = (description, systemProfile, lang) => {
-  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
-  const targetLang = languageMap[lang] || "english";
-  
-  return `Sei un esperto sysadmin Linux. Genera il comando Linux corretto per la seguente descrizione. Rispondi SOLO in ${targetLang}.
+  return `${systemContext}
 
-CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
+TASK: Generate the exact Linux command for this request.
 
-DESCRIZIONE: ${description}
+REQUEST: ${description}
 
-Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
+Respond STRICTLY with this JSON format (no other text before or after):
 {
-  "command": "comando Linux esatto",
-  "explanation": "Spiegazione di cosa fa il comando"
+  "command": "the exact command to run",
+  "explanation": "What each part of the command does, flag by flag",
+  "warning": "Any risks or side effects (null if safe)",
+  "alternatives": "Alternative approaches if any (null if none)"
 }`;
-};
+}
 
-// Prompt per generare configurazioni
-export const buildConfigPrompt = (configType, description, systemProfile, lang) => {
-  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
-  const targetLang = languageMap[lang] || "english";
-  
-  let filename = "";
-  switch(configType.toLowerCase()) {
-    case "nginx": filename = "nginx.conf"; break;
-    case "docker-compose": filename = "docker-compose.yml"; break;
-    case "systemd service": filename = "/etc/systemd/system/myapp.service"; break;
-    case "lnd (lnd.conf)": filename = "lnd.conf"; break;
-    case "bitcoin (bitcoin.conf)": filename = "bitcoin.conf"; break;
-    default: filename = "config.conf";
-  }
-  
-  return `Sei un esperto sysadmin Linux. Genera un file di configurazione ${configType} professionale e commentato. Rispondi SOLO in ${targetLang}.
+export function buildExplainPrompt(commandOrScript, systemProfile, lang) {
+  const systemContext = getSystemContext(systemProfile, lang);
 
-CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
+  return `${systemContext}
 
-REQUISITI: ${description}
+TASK: Explain this command or script line by line.
 
-Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
+INPUT:
+\`\`\`
+${commandOrScript}
+\`\`\`
+
+Respond STRICTLY with this JSON format (no other text before or after):
 {
-  "filename": "${filename}",
-  "config": "il contenuto completo del file di configurazione con commenti in linea",
-  "explanation": "spiegazione dei punti chiave della configurazione e come usarla"
+  "summary": "One-sentence summary of what this does",
+  "lines": [
+    { "line": "exact line of code", "explanation": "what this line does" }
+  ],
+  "risks": "Any security risks or dangerous operations (null if safe)",
+  "improvements": "Suggested improvements (null if already good)"
 }`;
-};
+}
 
-// Prompt per troubleshooting (genera domande)
-export const buildTroubleshootQuestionsPrompt = (problem, systemProfile, lang) => {
-  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
-  const targetLang = languageMap[lang] || "english";
-  
-  return `Sei un esperto sysadmin Linux. Fai una diagnosi guidata. Rispondi SOLO in ${targetLang}.
+export function buildConfigPrompt(description, configType, systemProfile, lang) {
+  const systemContext = getSystemContext(systemProfile, lang);
 
-PROBLEMA: ${problem}
-CONTESTO: ${systemProfile || "Non specificato"}
+  return `${systemContext}
 
-Genera 3 domande specifiche CIASCUNA con 3-4 opzioni SEMPLICI (stringhe, non oggetti).
+TASK: Generate a production-ready configuration file.
 
-Formato ESATTO della risposta (solo JSON, nient'altro):
+CONFIG TYPE: ${configType}
+REQUIREMENTS: ${description}
+
+Respond STRICTLY with this JSON format (no other text before or after):
 {
-  "questions": [
-    { "text": "Prima domanda?", "options": ["Opzione A", "Opzione B", "Opzione C"] },
-    { "text": "Seconda domanda?", "options": ["Opzione X", "Opzione Y", "Opzione Z"] },
-    { "text": "Terza domanda?", "options": ["Opzione 1", "Opzione 2", "Opzione 3"] }
-  ]
+  "filename": "suggested filename (e.g., nginx.conf, docker-compose.yml)",
+  "config": "the complete configuration file content",
+  "explanation": "Brief explanation of key settings and why they were chosen",
+  "security_notes": "Security considerations for this config"
 }`;
-};
+}
 
-// Prompt per troubleshooting (genera soluzione basata sulle risposte)
-export const buildTroubleshootSolutionPrompt = (problem, answers, questions, systemProfile, lang) => {
-  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
-  const targetLang = languageMap[lang] || "english";
+export function buildTroubleshootPrompt(problem, previousSteps, systemProfile, lang) {
+  const systemContext = getSystemContext(systemProfile, lang);
+  const prevContext = previousSteps?.length
+    ? `\nPREVIOUS DIAGNOSTIC STEPS:\n${previousSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+    : '';
 
-  // Costruisce il contesto delle risposte
-  let qaContext = "";
-  for (let i = 0; i < questions.length; i++) {
-    qaContext += `\nQ${i+1}: ${questions[i].text}\nA: ${answers[i]}\n`;
-  }
+  return `${systemContext}
 
-  return `Sei un esperto sysadmin Linux. Basandoti sulle risposte fornite, identifica la soluzione al problema. Rispondi SOLO in ${targetLang}.
+TASK: Guide troubleshooting for this problem.
+${prevContext}
+PROBLEM: ${problem}
 
-CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
-
-PROBLEMA ORIGINALE: ${problem}
-
-DIAGNOSI:
-${qaContext}
-
-Rispondi STRETTAMENTE con questo formato JSON:
+Respond STRICTLY with this JSON format (no other text before or after):
 {
-  "explanation": "spiegazione della causa root e dei passaggi per risolverlo",
-  "fix": "comandi Linux da eseguire per risolvere (uno per riga)"
+  "diagnosis": "Most likely cause based on the description",
+  "check_command": "Command to run to verify the diagnosis",
+  "expected_output": "What the output should look like if this is the cause",
+  "fix": "Commands to fix the issue",
+  "follow_up_question": "Question to ask if the diagnosis is wrong (null if confident)"
 }`;
-};
+}
 
-// Prompt per generare script
-export const buildScriptPrompt = (scriptType, description, systemProfile, lang) => {
-  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
-  const targetLang = languageMap[lang] || "english";
-  
-  let filename = "";
-  switch(scriptType.toLowerCase()) {
-    case "bash": filename = "script.sh"; break;
-    case "python": filename = "script.py"; break;
-    case "powershell": filename = "script.ps1"; break;
-    case "node.js": filename = "script.js"; break;
-    default: filename = "script.sh";
-  }
-  
-  return `Sei un esperto sysadmin Linux. Genera uno script ${scriptType} professionale, ben commentato e con error handling. Rispondi SOLO in ${targetLang}.
+export function buildScriptPrompt(description, scriptType, systemProfile, lang) {
+  const systemContext = getSystemContext(systemProfile, lang);
 
-CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
+  return `${systemContext}
 
-REQUISITI: ${description}
+TASK: Generate a complete, production-ready script.
 
-Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
+SCRIPT TYPE: ${scriptType || 'bash'}
+REQUIREMENTS: ${description}
+
+The script MUST include:
+- Shebang line
+- Error handling (set -euo pipefail for bash)
+- Input validation
+- Logging
+- Helpful comments
+- Usage information
+
+Respond STRICTLY with this JSON format (no other text before or after):
 {
-  "filename": "${filename}",
-  "script": "il contenuto completo dello script con commenti in linea e error handling",
-  "explanation": "spiegazione di cosa fa lo script e come eseguirlo"
+  "filename": "suggested filename",
+  "script": "the complete script content",
+  "usage": "How to use this script",
+  "dependencies": "Required packages or tools (null if none)"
 }`;
-};
+}
 
-// Prompt per security auditor
-export const buildSecurityAuditPrompt = (inputType, sourceText, systemProfile, lang) => {
-  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
-  const targetLang = languageMap[lang] || "english";
-  
-  return `Sei un esperto di cybersecurity. Analizza la seguente configurazione o descrizione e fornisci un report di sicurezza. Rispondi SOLO in ${targetLang}.
+export function buildSecurityAuditPrompt(configOrDescription, auditType, scanResults, systemProfile, lang) {
+  const systemContext = getSystemContext(systemProfile, lang);
+  const scanContext = scanResults ? `\nSCAN RESULTS:\n\`\`\`\n${scanResults}\n\`\`\`` : '';
 
-CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
+  return `${systemContext}
 
-TIPO INPUT: ${inputType}
-CONTENUTO: ${sourceText}
+TASK: Security audit and hardening recommendations.
 
-Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
+AUDIT TYPE: ${auditType || 'general'}
+${scanContext}
+INPUT:
+\`\`\`
+${configOrDescription}
+\`\`\`
+
+Respond STRICTLY with this JSON format (no other text before or after):
 {
-  "report": "Analisi dettagliata dei problemi di sicurezza trovati, con spiegazione dei rischi",
-  "recommendations": "Raccomandazioni specifiche per risolvere ogni problema, con comandi dove necessario"
+  "risk_level": "LOW|MEDIUM|HIGH|CRITICAL",
+  "findings": [
+    { "issue": "description", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "fix": "command or action" }
+  ],
+  "hardening": "Additional hardening commands (one per line)",
+  "compliance_notes": "Relevant CIS/NIST recommendations if applicable"
 }`;
-};
+}
 
-// Prompt per security scan remoto
-export const buildSecurityScanPrompt = (targetHost, ports, systemProfile, lang) => {
-  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
-  const targetLang = languageMap[lang] || "english";
-  
-  return `Sei un esperto di cybersecurity. Analizza la sicurezza remota del target ${targetHost} sulle porte: ${ports}. Rispondi SOLO in ${targetLang}.
-
-Per ogni porta aperta, identifica:
-- Servizio tipico
-- Rischi di sicurezza comuni
-- Ciphers/protocolli deboli (per TLS/SSL)
-- Best practice per hardening
-
-CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
-
-Rispondi STRETTAMENTE con questo formato JSON:
-{
-  "report": "Analisi dettagliata per ogni porta trovata, con rischi e vulnerabilità",
-  "recommendations": "Raccomandazioni specifiche per proteggere ogni servizio esposto"
-}`;
-};
-// Prompt per analizzare output di scan
+// Prompt per analizzare output di scan (nmap, sslscan, ssh-audit)
 export const buildSecurityScanAnalysisPrompt = (targetHost, scanType, scanOutput, systemProfile, lang) => {
   const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
   const targetLang = languageMap[lang] || "english";

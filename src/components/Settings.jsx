@@ -1,11 +1,24 @@
 import { useState, useEffect } from "react";
 import { AI_PROVIDERS } from "../utils/aiProviders";
-import { fetchModelsForProvider, fetchOllamaModels } from "../utils/fetchModels";
+import { fetchModels } from "../utils/aiProviders";
 
 const Settings = ({ t, lang, theme, accent, accentDim, surface, surface2, border, bg, text1, text2, danger, apiKeys, selectedModels, availableModels, loadingModels, defaultProvider, systemProfile, saved, onSetLang, onSetTheme, onSetApiKey, onSetSelectedModel, onSetDefaultProvider, onSetSystemProfile, onSave, onBack }) => {
+    // Funzione per ottenere modelli Ollama (locale)
+  const fetchOllamaModels = async (baseURL = "http://localhost:11434") => {
+    try {
+      const response = await fetch(`${baseURL}/api/tags`);
+      const data = await response.json();
+      return (data.models || []).map(m => ({ id: m.name, name: m.name }));
+    } catch (error) {
+      console.error("Ollama error:", error);
+      return [];
+    }
+  };
   const [ollamaModels, setOllamaModels] = useState([]);
   const [loadingOllama, setLoadingOllama] = useState(false);
   const [localLoadingModels, setLocalLoadingModels] = useState({});
+
+
 
   // Carica modelli Ollama all'avvio
   useEffect(() => {
@@ -34,7 +47,7 @@ const Settings = ({ t, lang, theme, accent, accentDim, surface, surface2, border
     
     setLocalLoadingModels(prev => ({ ...prev, [providerId]: true }));
     try {
-      const models = await fetchModelsForProvider(providerId, apiKey);
+      const models = await fetchModels(providerId, apiKey);
       if (models.length > 0) {
         // Aggiorna availableModels (passato dal parent)
         onSetSelectedModel(providerId, models[0].id);

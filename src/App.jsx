@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import LANGS, { FREE_MODES } from "./i18n";
-import { AI_PROVIDERS, callAI, buildLogAnalysisPrompt, buildCommandPrompt, buildConfigPrompt, buildTroubleshootQuestionsPrompt, buildTroubleshootSolutionPrompt, buildScriptPrompt, buildSecurityAuditPrompt, buildSecurityScanAnalysisPrompt } from "./utils/aiProviders";
-import { fetchModelsForProvider } from "./utils/fetchModels";
+import { AI_PROVIDERS, callAI, fetchModels, buildLogAnalysisPrompt, buildCommandPrompt, buildConfigPrompt, buildTroubleshootPrompt, buildScriptPrompt, buildSecurityAuditPrompt, buildSecurityScanAnalysisPrompt } from "./utils/aiProviders";
 import Toast from "./components/Toast";
 import { useToast } from "./hooks/useToast";
 import ModeCard from "./components/ModeCard";
@@ -12,6 +11,7 @@ import ConfigGenerator from "./components/ConfigGenerator";
 import Troubleshooter from "./components/Troubleshooter";
 import ScriptBuilder from "./components/ScriptBuilder";
 import SecurityAuditor from "./components/SecurityAuditor";
+
 function App() {
   const [lang, setLang] = useState("en");
   const [theme, setTheme] = useState("dark");
@@ -55,7 +55,7 @@ function App() {
         
         setLoadingModels(prev => ({ ...prev, [provider.id]: true }));
         try {
-          const models = await fetchModelsForProvider(provider.id, apiKey);
+          const models = await fetchModels(provider.id, apiKey);
           setAvailableModels(prev => ({ ...prev, [provider.id]: models }));
           if (!selectedModels[provider.id] && models.length > 0) {
             setSelectedModels(prev => ({ ...prev, [provider.id]: models[0].id }));
@@ -120,7 +120,7 @@ function App() {
     }
     
     try {
-      const prompt = buildConfigPrompt(configType, description, systemProfile, lang);
+      const prompt = buildConfigPrompt(description, configType, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       console.log("🤖 AI response:", response.substring(0, 200));
@@ -138,8 +138,7 @@ function App() {
     }
   };
 
-  
-  const handleTroubleshoot = async (problem, action, answers = [], questions = []) => {
+  const handleTroubleshoot = async (problem, previousSteps = []) => {
     const apiKey = apiKeys[defaultProvider];
     const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
     if (provider?.requiresApiKey && !apiKey) {
@@ -149,12 +148,7 @@ function App() {
     }
     
     try {
-      let prompt;
-      if (action === "start") {
-        prompt = buildTroubleshootQuestionsPrompt(problem, systemProfile, lang);
-      } else {
-        prompt = buildTroubleshootSolutionPrompt(problem, answers, questions, systemProfile, lang);
-      }
+      const prompt = buildTroubleshootPrompt(problem, previousSteps, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       console.log("🤖 AI response:", response.substring(0, 200));
@@ -162,7 +156,7 @@ function App() {
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
-        showToast(action === "start" ? "Domande generate!" : "Soluzione trovata!", "success");
+        showToast("Diagnosi completata!", "success");
         return result;
       }
       return null;
@@ -182,17 +176,44 @@ function App() {
     }
     
     try {
-      const prompt = buildScriptPrompt(scriptType, description, systemProfile, lang);
+      const prompt = buildScriptPrompt(description, scriptType, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
+      // Risposta di fallback
+      let result = {
+        filename: "script.sh",
+        script: response.length > 200 ? response.substring(0, 200) + "\n# ... (script troncato)" : response,
+        usage: "chmod +x script.sh && ./script.sh",
+        dependencies: "bash"
+      };
+      
+      // Prova a estrarre JSON pulito
+      const jsonMatch = response.match(/\{[^{}]*"script"\s*:\s*"([^"]*)"[^{}]*\}/);
+      if (jsonMatch && jsonMatch[1]) {
+        result.script = jsonMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
         showToast("Script generato!", "success");
         return result;
       }
-      return { filename: "script.sh", script: response, explanation: "Script generato" };
+      
+      // Cerca JSON anche se malformato
+      const start = response.indexOf('{');
+      const end = response.lastIndexOf('}');
+      if (start !== -1 && end !== -1 && end > start) {
+        try {
+          const parsed = JSON.parse(response.substring(start, end + 1));
+          if (parsed.script) {
+            result.script = parsed.script;
+            result.filename = parsed.filename || result.filename;
+            result.usage = parsed.usage || result.usage;
+            showToast("Script generato!", "success");
+            return result;
+          }
+        } catch (e) {}
+      }
+      
+      showToast("Script generato (formato semplice)!", "success");
+      return result;
     } catch (error) {
       showToast(`Errore: ${error.message}`, "error");
       return null;
@@ -209,7 +230,7 @@ function App() {
     }
     
     try {
-      const prompt = buildSecurityAuditPrompt(inputType, sourceText, systemProfile, lang);
+      const prompt = buildSecurityAuditPrompt(sourceText, inputType, null, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       
@@ -252,6 +273,7 @@ function App() {
       return null;
     }
   };
+
   const handleCraftCommand = async (cmdText) => {
     const apiKey = apiKeys[defaultProvider];
     const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
@@ -318,7 +340,6 @@ function App() {
     <div style={{ fontFamily: "'Outfit', sans-serif", background: bg, color: text1, minHeight: "100vh" }}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
 
-      {/* Navbar */}
       <nav style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "12px 20px", background: surface, borderBottom: `1px solid ${border}`,
@@ -362,7 +383,6 @@ function App() {
         </div>
       </nav>
 
-      {/* Sidebar */}
       {sidebarOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex" }}>
           <div onClick={() => setSidebarOpen(false)} style={{ position: "absolute", inset: 0, background: "#00000066" }} />
@@ -420,7 +440,6 @@ function App() {
         </div>
       )}
 
-      {/* Pro Banner */}
       {showProBanner && (
         <div style={{
           position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)", zIndex: 500,
@@ -431,7 +450,6 @@ function App() {
         </div>
       )}
 
-      {/* Main Content */}
       <main style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto", width: "100%" }}>
         {page === "home" && (
           <div>
@@ -481,29 +499,24 @@ function App() {
         {page === "configGenerator" && (
           <ConfigGenerator t={t} onGenerate={handleGenerateConfig} onBack={() => setPage("home")} />
         )}
+
         {page === "troubleshooter" && (
           <Troubleshooter t={t} onDiagnose={handleTroubleshoot} onBack={() => setPage("home")} />
         )}
-	{page === "scriptBuilder" && (
+
+        {page === "scriptBuilder" && (
           <ScriptBuilder t={t} onGenerate={handleGenerateScript} onBack={() => setPage("home")} />
         )}
+
         {page === "securityAuditor" && (
           <SecurityAuditor 
             t={t} 
             onAudit={handleSecurityAudit} 
             onScan={handleSecurityScan} 
             onBack={() => setPage("home")} 
-            runCommand={async (cmd) => {
-              try {
-                const result = await window.electron.ipcRenderer.invoke('run-command', cmd);
-                return result;
-              } catch (err) {
-                console.error('runCommand error:', err);
-                return { success: false, output: err.message };
-              }
-            }}
           />
         )}
+
         {page === "settings" && (
           <Settings
             t={t}
@@ -536,8 +549,7 @@ function App() {
           />
         )}
 
-        {/* Placeholder per altre pagine Pro */}
-	{["scriptBuilder", "history", "favorites", "snippets", "explainMode"].includes(page) && (
+        {["history", "favorites", "snippets", "explainMode"].includes(page) && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48 }}>🔒</div>
             <h2>Pro Feature</h2>
@@ -547,6 +559,6 @@ function App() {
       </main>
     </div>
   );
-};
+}
 
 export default App;

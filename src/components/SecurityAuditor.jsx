@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { portScan, tlsCheck, sshAudit } from "../utils/scanners";
 
-const SecurityAuditor = ({ t, onAudit, onScan, onBack, runCommand }) => {
-  const [mode, setMode] = useState(0); // 0 = config, 1 = remote scan
+const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
+  const [mode, setMode] = useState(0);
   const [inputType, setInputType] = useState(0);
   const [sourceText, setSourceText] = useState("");
   const [targetHost, setTargetHost] = useState("");
-  const [scanType, setScanType] = useState("ports"); // ports, ssl, ssh
+  const [scanType, setScanType] = useState("ports");
   const [scanPorts, setScanPorts] = useState("22,80,443,3306,5432");
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
@@ -21,25 +22,52 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack, runCommand }) => {
       const inputTypeName = t.securityAuditorPage.types[inputType];
       response = await onAudit(inputTypeName, sourceText);
     } else {
-      // Esegui scan locale
-      let command = "";
-      if (scanType === "ports") {
-        command = `nmap -sV --open -p ${scanPorts} ${targetHost}`;
-      } else if (scanType === "ssl") {
-        command = `sslscan --no-failed ${targetHost}`;
-      } else if (scanType === "ssh") {
-        command = `ssh-audit -p 22 ${targetHost}`;
-      }    
-      const scanResult = await runCommand(command);
-      if (scanResult.success) {
-        response = await onScan(targetHost, scanType, scanResult.output);
-      } else {
-        response = { report: `Errore scan: ${scanResult.output}`, recommendations: "Verifica che il tool sia installato" };
+      try {
+        let scanResult;
+        if (scanType === "ports") {
+          scanResult = await portScan(targetHost, { ports: scanPorts });
+          if (scanResult.success) {
+            response = await onScan(targetHost, scanType, scanResult.output);
+          } else {
+            response = { report: `Errore scan: ${scanResult.error}`, recommendations: "Verifica che il target sia raggiungibile" };
+          }
+        } else if (scanType === "ssl") {
+          scanResult = await tlsCheck(targetHost, 443);
+          if (scanResult.success) {
+            const output = formatTlsCheck(scanResult);
+            response = await onScan(targetHost, scanType, output);
+          } else {
+            response = { report: `Errore TLS: ${scanResult.error}`, recommendations: "Verifica che il target supporti HTTPS" };
+          }
+        } else if (scanType === "ssh") {
+          scanResult = await sshAudit(targetHost, 22);
+          if (scanResult.success) {
+            response = await onScan(targetHost, scanType, scanResult.output);
+          } else {
+            response = { report: `Errore SSH: ${scanResult.output}`, recommendations: "Verifica che il target abbia SSH sulla porta 22" };
+          }
+        }
+      } catch (error) {
+        response = { report: `Errore: ${error.message}`, recommendations: "Riprova più tardi" };
       }
     }
     
     setResult(response);
     setAnalyzing(false);
+  };
+
+  const formatTlsCheck = (result) => {
+    let output = `TLS Check for ${result.host}:${result.port}\n`;
+    output += `Protocol: ${result.protocol || 'N/A'}\n`;
+    output += `Cipher: ${result.cipher?.name || 'N/A'} (${result.cipher?.bits || '?'} bits)\n`;
+    if (result.certificate) {
+      output += `Certificate: ${result.certificate.subject?.CN || 'N/A'}\n`;
+      output += `Valid until: ${result.certificate.valid_to || 'N/A'}\n`;
+    }
+    if (result.warnings?.length) {
+      output += `Warnings: ${result.warnings.join(', ')}\n`;
+    }
+    return output;
   };
 
   return (
@@ -53,7 +81,6 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack, runCommand }) => {
       </h2>
       <p style={{ color: "#8B95A8", fontSize: 14, marginBottom: 20 }}>{t.securityAuditorPage.subtitle}</p>
 
-      {/* Modalità */}
       <div style={{ marginBottom: 16 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
           Modalità

@@ -46,13 +46,7 @@ const ScriptBuilder = ({ t, onGenerate, onBack }) => {
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder={`Describe what you want the script to do...
-
-Examples:
-- "Backup all databases and upload to S3, keep 7 days of backups"
-- "Monitor log file for errors and send Telegram notification"
-- "Sync two directories with rsync and log results"
-- "Check website SSL certificate expiry and warn if less than 30 days"`}
+        placeholder="Describe what you want the script to do..."
         style={{
           width: "100%", height: 120, padding: 16, borderRadius: 12,
           background: "#131720", border: "1px solid #1E2535",
@@ -68,7 +62,7 @@ Examples:
         {analyzing ? t.scriptBuilderPage.generating : t.scriptBuilderPage.generate}
       </button>
 
-      {result && (
+      {result && result.script && (
         <div style={{ marginTop: 24, animation: "slideInRight 0.3s ease" }}>
           <div style={{
             background: "#131720", border: "1px solid #00D4AA33", borderRadius: 12,
@@ -92,15 +86,6 @@ Examples:
               maxHeight: 400, overflowY: "auto",
             }}>{result.script}</pre>
           </div>
-          {result.explanation && (
-            <div style={{
-              background: "#131720", border: "1px solid #1E2535", borderRadius: 12,
-              padding: 16, marginTop: 12,
-            }}>
-              <h4 style={{ fontSize: 13, fontWeight: 600, color: "#8B95A8", marginBottom: 8 }}>💡 Explanation</h4>
-              <p style={{ fontSize: 13, color: "#8B95A8", lineHeight: 1.5 }}>{result.explanation}</p>
-            </div>
-          )}
         </div>
       )}
     </div>

@@ -1,62 +1,44 @@
 {
   "name": "sysai-assistant",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
   "author": {
     "name": "SysAI Team",
     "email": "support@sysai.com"
   },
+  "homepage": "https://github.com/shadowbipnode/sysai-assistant",
   "description": "AI-Powered Linux Sysadmin Toolkit",
   "main": "electron.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "electron": "NODE_ENV=development electron .",
-    "electron:build": "npm run build && electron-builder"
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "electron:build": "vite build && electron-builder --config electron-builder.json",
+    "electron:build:deb": "vite build && electron-builder --linux deb --config electron-builder.json",
+    "electron:build:rpm": "vite build && electron-builder --linux rpm --config electron-builder.json",
+    "electron:build:appimage": "vite build && electron-builder --linux AppImage --config electron-builder.json",
+    "electron:build:all": "vite build && electron-builder --linux deb rpm AppImage --config electron-builder.json",
+    "postinstall": "electron-builder install-app-deps",
+    "prepare:bin": "chmod +x bin/ssh-audit 2>/dev/null || true"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.90.0",
-    "@google/generative-ai": "^0.24.1",
-    "@tailwindcss/vite": "^4.2.4",
-    "@tauri-apps/api": "^2.10.1",
     "axios": "^1.15.2",
     "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "lucide-react": "^1.8.0",
-    "openai": "^6.34.0",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "tailwindcss": "^4.2.4"
+    "express": "^5.2.1"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
-    "@tauri-apps/cli": "^2.10.1",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
-    "electron": "^41.3.0",
-    "electron-builder": "^26.8.1",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.4.0",
+    "electron-builder": "^26.0.0",
     "eslint": "^9.39.4",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.5.0",
-    "vite": "^8.0.9"
-  },
-  "build": {
-    "appId": "com.sysai.desktop",
-    "productName": "SysAI",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "server.js",
-      "electron.js"
-    ],
-    "linux": {
-      "target": ["AppImage", "deb"],
-      "category": "Development"
-    }
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "tailwindcss": "^4.2.4",
+    "@tailwindcss/vite": "^4.2.4",
+    "vite": "^8.0.9",
+    "wait-on": "^8.0.0"
   }
 }

@@ -1,16 +1,65 @@
 directories:
   output: release
-  buildResources: build
-appId: com.sysai.desktop
+  buildResources: build-resources
+appId: com.sysai.assistant
 productName: SysAI
+artifactName: sysai-assistant_${version}_${arch}.${ext}
 files:
   - filter:
       - dist/**/*
-      - server.js
       - electron.js
+      - preload.js
+      - server.js
+      - package.json
+      - node_modules/**/*
+      - bin/**/*
+asarUnpack:
+  - bin/**/*
+  - node_modules/@tailwindcss/oxide-linux-x64-gnu/**
+  - node_modules/@tailwindcss/oxide-linux-x64-musl/**
+  - node_modules/lightningcss-linux-x64-gnu/**
+  - node_modules/lightningcss-linux-x64-musl/**
 linux:
   target:
-    - AppImage
-    - deb
+    - target: deb
+      arch:
+        - x64
+    - target: rpm
+      arch:
+        - x64
+    - target: AppImage
+      arch:
+        - x64
   category: Development
-electronVersion: 41.3.0
+  icon: build-resources/icons
+  synopsis: AI-Powered Linux Sysadmin Toolkit
+  description: SysAI - Analyze logs, generate commands, audit security, and troubleshoot Linux systems with AI assistance.
+  desktop:
+    entry:
+      Name: SysAI
+      Comment: AI-Powered Linux Sysadmin Toolkit
+      Categories: Development;System;Utility;
+      Keywords: sysadmin;linux;ai;security;logs;terminal;
+deb:
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+rpm:
+  depends:
+    - gtk3
+    - libnotify
+    - nss
+    - libXScrnSaver
+    - libXtst
+    - xdg-utils
+    - at-spi2-core
+    - libuuid
+    - libsecret
+electronVersion: 33.4.11
