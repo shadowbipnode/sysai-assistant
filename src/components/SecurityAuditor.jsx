@@ -11,6 +11,43 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
 
+  const formatTlsCheck = (result) => {
+    let output = `TLS Check for ${result.host}:${result.port}\n`;
+    output += `Protocol: ${result.protocol || 'N/A'}\n`;
+    output += `Cipher: ${result.cipher?.name || 'N/A'} (${result.cipher?.bits || '?'} bits)\n`;
+    if (result.certificate) {
+      output += `Certificate: ${result.certificate.subject?.CN || 'N/A'}\n`;
+      output += `Valid until: ${result.certificate.valid_to || 'N/A'}\n`;
+    }
+    if (result.warnings?.length) {
+      output += `Warnings: ${result.warnings.join(', ')}\n`;
+    }
+    return output;
+  };
+
+  const formatPortResults = (result) => {
+    if (!result?.results) return "Nessun risultato";
+    
+    const open = result.results.filter(r => r.status === 'open');
+    const closed = result.results.filter(r => r.status === 'closed');
+    const filtered = result.results.filter(r => r.status === 'filtered');
+    
+    let output = `Port Scan: ${result.target}\n`;
+    output += `Open: ${open.length} | Closed: ${closed.length} | Filtered: ${filtered.length}\n\n`;
+    
+    if (open.length > 0) {
+      output += `PORT      STATE   SERVICE       BANNER\n`;
+      open.forEach(r => {
+        const port = String(r.port).padEnd(8);
+        const state = 'open'.padEnd(8);
+        const service = (r.service || 'unknown').padEnd(14);
+        const banner = r.banner || '';
+        output += `${port}${state}${service}${banner}\n`;
+      });
+    }
+    return output;
+  };
+
   const handleAudit = async () => {
     if (mode === 0 && !sourceText.trim()) return;
     if (mode === 1 && !targetHost.trim()) return;
@@ -27,7 +64,8 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         if (scanType === "ports") {
           scanResult = await portScan(targetHost, { ports: scanPorts });
           if (scanResult.success) {
-            response = await onScan(targetHost, scanType, scanResult.output);
+            const output = formatPortResults(scanResult);
+            response = await onScan(targetHost, scanType, output);
           } else {
             response = { report: `Errore scan: ${scanResult.error}`, recommendations: "Verifica che il target sia raggiungibile" };
           }
@@ -54,20 +92,6 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
     
     setResult(response);
     setAnalyzing(false);
-  };
-
-  const formatTlsCheck = (result) => {
-    let output = `TLS Check for ${result.host}:${result.port}\n`;
-    output += `Protocol: ${result.protocol || 'N/A'}\n`;
-    output += `Cipher: ${result.cipher?.name || 'N/A'} (${result.cipher?.bits || '?'} bits)\n`;
-    if (result.certificate) {
-      output += `Certificate: ${result.certificate.subject?.CN || 'N/A'}\n`;
-      output += `Valid until: ${result.certificate.valid_to || 'N/A'}\n`;
-    }
-    if (result.warnings?.length) {
-      output += `Warnings: ${result.warnings.join(', ')}\n`;
-    }
-    return output;
   };
 
   return (
@@ -154,21 +178,21 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
                 color: scanType === "ports" ? "#0B0E14" : "#8B95A8",
                 border: `1px solid ${scanType === "ports" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
-              }}>🔌 Porte (nmap)</button>
+              }}>🔌 Port Scan</button>
               <button onClick={() => setScanType("ssl")} style={{
                 flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
                 background: scanType === "ssl" ? "#00D4AA" : "#1A1F2E",
                 color: scanType === "ssl" ? "#0B0E14" : "#8B95A8",
                 border: `1px solid ${scanType === "ssl" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
-              }}>🔒 SSL/TLS (sslscan)</button>
+              }}>🔒 TLS Check</button>
               <button onClick={() => setScanType("ssh")} style={{
                 flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
                 background: scanType === "ssh" ? "#00D4AA" : "#1A1F2E",
                 color: scanType === "ssh" ? "#0B0E14" : "#8B95A8",
                 border: `1px solid ${scanType === "ssh" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
-              }}>🖥️ SSH (ssh-audit)</button>
+              }}>🖥️ SSH Audit</button>
             </div>
           </div>
 

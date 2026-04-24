@@ -51,7 +51,8 @@
       "xdg-utils",
       "libatspi2.0-0",
       "libuuid1",
-      "libsecret-1-0"
+      "libsecret-1-0",
+      "python3"
     ]
   },
   "rpm": {
@@ -64,7 +65,8 @@
       "xdg-utils",
       "at-spi2-core",
       "libuuid",
-      "libsecret"
+      "libsecret",
+      "python3"
     ]
   }
 }

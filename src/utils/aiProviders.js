@@ -176,28 +176,21 @@ Respond STRICTLY with this JSON format (no other text before or after):
 }
 
 export function buildExplainPrompt(commandOrScript, systemProfile, lang) {
-  const systemContext = getSystemContext(systemProfile, lang);
+  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
+  const targetLang = languageMap[lang] || "english";
 
-  return `${systemContext}
+  return `${getSystemContext(systemProfile, lang)}
 
-TASK: Explain this command or script line by line.
+TASK: Explain this command or script line by line. You MUST respond with ONLY valid JSON.
 
 INPUT:
 \`\`\`
 ${commandOrScript}
 \`\`\`
 
-Respond STRICTLY with this JSON format (no other text before or after):
-{
-  "summary": "One-sentence summary of what this does",
-  "lines": [
-    { "line": "exact line of code", "explanation": "what this line does" }
-  ],
-  "risks": "Any security risks or dangerous operations (null if safe)",
-  "improvements": "Suggested improvements (null if already good)"
-}`;
+Response MUST be in this EXACT JSON format (no markdown, no extra text):
+{"summary": "one sentence summary", "lines": [{"line": "exact line", "explanation": "what it does"}], "risks": "risks or null", "improvements": "improvements or null"}`;
 }
-
 export function buildConfigPrompt(description, configType, systemProfile, lang) {
   const systemContext = getSystemContext(systemProfile, lang);
 

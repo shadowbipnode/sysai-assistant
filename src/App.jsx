@@ -11,7 +11,8 @@ import ConfigGenerator from "./components/ConfigGenerator";
 import Troubleshooter from "./components/Troubleshooter";
 import ScriptBuilder from "./components/ScriptBuilder";
 import SecurityAuditor from "./components/SecurityAuditor";
-
+import ExplainMode from "./components/ExplainMode";
+import { buildExplainPrompt } from "./utils/aiProviders";
 function App() {
   const [lang, setLang] = useState("en");
   const [theme, setTheme] = useState("dark");
@@ -274,6 +275,33 @@ function App() {
     }
   };
 
+  const handleExplain = async (command) => {
+    const apiKey = apiKeys[defaultProvider];
+    const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
+    if (provider?.requiresApiKey && !apiKey) {
+      showToast(`Inserisci API Key per ${provider.name}`, "error");
+      setPage("settings");
+      return null;
+    }
+    
+    try {
+      const prompt = buildExplainPrompt(command, systemProfile, lang);
+      const model = getCurrentModel();
+      const response = await callAI(defaultProvider, apiKey, prompt, model);
+      
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        showToast("Spiegazione completata!", "success");
+        return result;
+      }
+      return { summary: response, lines: [], risks: null, improvements: null };
+    } catch (error) {
+      showToast(`Errore: ${error.message}`, "error");
+      return null;
+    }
+  };
+
   const handleCraftCommand = async (cmdText) => {
     const apiKey = apiKeys[defaultProvider];
     const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
@@ -364,7 +392,8 @@ function App() {
             display: "flex", alignItems: "center", gap: 6,
             background: accentDim, padding: "4px 12px", borderRadius: 20,
             fontSize: 11, fontWeight: 500, color: accent,
-          }}>
+	    cursor: "pointer",
+          }} onClick={() => setPage("settings")}>
             <span>🤖</span>
             <span>{getCurrentProvider()}</span>
             <span style={{ opacity: 0.5 }}>•</span>
@@ -508,6 +537,10 @@ function App() {
           <ScriptBuilder t={t} onGenerate={handleGenerateScript} onBack={() => setPage("home")} />
         )}
 
+        {page === "explainMode" && (
+          <ExplainMode t={t} onExplain={handleExplain} onBack={() => setPage("home")} />
+        )}
+
         {page === "securityAuditor" && (
           <SecurityAuditor 
             t={t} 
@@ -549,7 +582,7 @@ function App() {
           />
         )}
 
-        {["history", "favorites", "snippets", "explainMode"].includes(page) && (
+        {["history", "favorites", "snippets"].includes(page) && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48 }}>🔒</div>
             <h2>Pro Feature</h2>

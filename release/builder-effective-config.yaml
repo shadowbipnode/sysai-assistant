@@ -51,6 +51,7 @@ deb:
     - libatspi2.0-0
     - libuuid1
     - libsecret-1-0
+    - python3
 rpm:
   depends:
     - gtk3
@@ -62,4 +63,5 @@ rpm:
     - at-spi2-core
     - libuuid
     - libsecret
+    - python3
 electronVersion: 33.4.11

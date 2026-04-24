@@ -1,15 +1,15 @@
 version: 1.0.0
 files:
   - url: sysai-assistant_1.0.0_x86_64.AppImage
-    sha512: y4y6Srgo36qVq/tAQr/SAwSobs3/B1OLjVaPyeEB+ftxU+l9dLX613QwgNO1C2eT3e9j+UkqE3PpZsmuNlHiDA==
-    size: 120204922
-    blockMapSize: 126606
+    sha512: Ir3JPnJfZ02oScW3Al5/8zEmMoGOB20audz8eprBJvSX4j1jO4LlVJQDds/mBvoqR9U2Qm4SPYzsAG0443Q7Ng==
+    size: 116989550
+    blockMapSize: 122498
   - url: sysai-assistant_1.0.0_amd64.deb
-    sha512: V1aKmwJtZ3O9C50KDAUBuYl5IIggNQTR2hmeWHSN9t56/BTas0QNICide+epSaSuCiIIKRZLI8voAYXV12cZbQ==
-    size: 95928832
+    sha512: i9z7DVxdgzT51H6OIHEyJlZsjcQNLlL7pf7AWKpkqCx4fZSWFF81nB5Ef3Xd5yfxZq/UwnA05nKrhMRDTJZbQA==
+    size: 93362352
   - url: sysai-assistant_1.0.0_x86_64.rpm
-    sha512: 9kP6oGqmyycsLE6Xykjg9IEm7N9uL7DAP/c/4uAv4kT/nscVyPDcBjTLrEvfQN8LyT47cJfBlGInRdMCFv3tvQ==
-    size: 86405709
+    sha512: w0QUHF4ETumUBkoQ2vxUuUzWCtXXmXJHLMlB7ue0sTL1EGE9TjPUMtPKpOr/9DZeAdykHd4bhUArHxQNl/LjyA==
+    size: 84064801
 path: sysai-assistant_1.0.0_x86_64.AppImage
-sha512: y4y6Srgo36qVq/tAQr/SAwSobs3/B1OLjVaPyeEB+ftxU+l9dLX613QwgNO1C2eT3e9j+UkqE3PpZsmuNlHiDA==
-releaseDate: '2026-04-24T11:41:27.205Z'
+sha512: Ir3JPnJfZ02oScW3Al5/8zEmMoGOB20audz8eprBJvSX4j1jO4LlVJQDds/mBvoqR9U2Qm4SPYzsAG0443Q7Ng==
+releaseDate: '2026-04-24T13:19:29.538Z'
