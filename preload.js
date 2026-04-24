@@ -2,9 +2,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // Canali IPC consentiti - WHITELIST di sicurezza
 const ALLOWED_CHANNELS = [
-  'run-scan',        // Scansioni di rete (port-scan, tls-check, ssh-audit)
-  'get-app-version', // Info versione app
-  'open-external',   // Apri link nel browser
+  'run-scan',           // Scansioni di rete (port-scan, tls-check, ssh-audit)
+  'get-app-version',    // Info versione app
+  'open-external',      // Apri link nel browser
+  'verify-license',     // Verifica firma license key
 ];
 
 contextBridge.exposeInMainWorld('electron', {
@@ -17,7 +18,6 @@ contextBridge.exposeInMainWorld('electron', {
       return Promise.reject(new Error(`Canale "${channel}" non consentito`));
     }
   },
-  // Esponi info piattaforma per la UI
   platform: process.platform,
   arch: process.arch,
 });

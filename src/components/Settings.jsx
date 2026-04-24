@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { AI_PROVIDERS } from "../utils/aiProviders";
 import { fetchModels } from "../utils/aiProviders";
+import LicenseSettings from './LicenseSettings';
 
-const Settings = ({ t, lang, theme, accent, accentDim, surface, surface2, border, bg, text1, text2, danger, apiKeys, selectedModels, availableModels, loadingModels, defaultProvider, systemProfile, saved, onSetLang, onSetTheme, onSetApiKey, onSetSelectedModel, onSetDefaultProvider, onSetSystemProfile, onSave, onBack }) => {
+const Settings = ({ t, lang, theme, accent, accentDim, surface, surface2, border, bg, text1, text2, danger, apiKeys, selectedModels, availableModels, loadingModels, defaultProvider, systemProfile, saved, onSetLang, onSetTheme, onSetApiKey, onSetSelectedModel, onSetDefaultProvider, onSetSystemProfile, onSave, onBack, license }) => {
     // Funzione per ottenere modelli Ollama (locale)
   const fetchOllamaModels = async (baseURL = "http://localhost:11434") => {
     try {
@@ -86,6 +87,9 @@ const Settings = ({ t, lang, theme, accent, accentDim, surface, surface2, border
         fontSize: 13, marginBottom: 16,
       }}>← {t.home}</button>
       <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>⚙ {t.settingsPage.title}</h2>
+
+      {/* License Section */}
+      <LicenseSettings license={license} lang={lang} />
 
       {/* AI Providers */}
       <div style={{

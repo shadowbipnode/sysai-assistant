@@ -4,6 +4,7 @@ const { spawn, exec, execFile } = require('child_process');
 const net = require('net');
 const tls = require('tls');
 const fs = require('fs');
+const crypto = require('crypto');
 
 let mainWindow;
 let proxyProcess;
@@ -396,4 +397,40 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   stopProxy();
+});
+// ============================================================
+// AGGIUNGI QUESTO BLOCCO nel tuo electron.js
+// Mettilo DOPO gli altri ipcMain.handle e PRIMA di app.whenReady()
+// ============================================================
+
+// ============================================================
+// LICENSE VERIFICATION (usa Node.js crypto nativo — Ed25519 OK)
+// ============================================================
+
+// ⚠️ SOSTITUISCI con la tua chiave pubblica (da: node generate-key.js --export-public)
+const LICENSE_PUBLIC_KEY_B64 = 'MCowBQYDK2VwAyEAQ2Z+R7D8Jx3/Vjj+dOvR6LHJPzEly2oAoBGWIlydLAw=';
+ipcMain.handle('verify-license', async (event, { payloadB64, signatureB64 }) => {
+  try {
+    // Ricostruisci la chiave pubblica dal formato SPKI/DER/Base64
+    const pubKeyDer = Buffer.from(LICENSE_PUBLIC_KEY_B64, 'base64');
+    const publicKey = crypto.createPublicKey({
+      key: pubKeyDer,
+      format: 'der',
+      type: 'spki',
+    });
+
+    // Converti signatureB64url in Buffer
+    const signature = Buffer.from(signatureB64, 'base64url');
+
+    // Dati da verificare
+    const data = Buffer.from(payloadB64);
+
+    // Verifica firma Ed25519
+    const isValid = crypto.verify(null, data, publicKey, signature);
+
+    return { valid: isValid };
+  } catch (err) {
+    console.error('[License] Errore verifica:', err.message);
+    return { valid: false, error: err.message };
+  }
 });

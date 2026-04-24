@@ -500,6 +500,6 @@ export const PROVIDERS = [
   { id: "ollama", name: "Ollama (Local)", color: "#6B7280", icon: "○" },
 ];
 
-export const FREE_MODES = ["logAnalyzer", "commandCrafter", "explainMode", "configGenerator", "troubleshooter", "scriptBuilder", "securityAuditor"];
+export const FREE_MODES = ["logAnalyzer", "commandCrafter", "explainMode"];
 
 export default LANGS;
