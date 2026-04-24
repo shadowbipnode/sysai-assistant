@@ -27,3 +27,4 @@ release/*.rpm
 release/*.AppImage
 release/*.zip
 release/
+release/
