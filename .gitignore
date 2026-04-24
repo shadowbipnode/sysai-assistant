@@ -26,3 +26,4 @@ release/*.deb
 release/*.rpm
 release/*.AppImage
 release/*.zip
+release/
