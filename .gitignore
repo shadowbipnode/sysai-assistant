@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+release/*.deb
+release/*.rpm
+release/*.AppImage
+release/*.zip

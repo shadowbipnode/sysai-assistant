@@ -9,7 +9,6 @@ const app = express();
 // ============================================================
 app.use(cors({
   origin: (origin, callback) => {
-    // Consenti: no origin (same-origin), file://, localhost
     if (!origin || origin.startsWith('file://') || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
       callback(null, true);
     } else {
@@ -56,7 +55,13 @@ app.post('/api/gemini', async (req, res) => {
 
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-      { contents: [{ parts: [{ text: prompt }] }] },
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: 16384,
+          temperature: 0.7,
+        }
+      },
       { headers: { 'Content-Type': 'application/json' }, timeout: 120000 }
     );
     const text = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -78,6 +83,7 @@ app.post('/api/openai', async (req, res) => {
         model: model || 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
+        max_tokens: 16384,
       },
       {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -101,7 +107,7 @@ app.post('/api/claude', async (req, res) => {
       'https://api.anthropic.com/v1/messages',
       {
         model: model || 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
+        max_tokens: 16384,
         messages: [{ role: 'user', content: prompt }],
       },
       {
@@ -132,6 +138,7 @@ app.post('/api/deepseek', async (req, res) => {
         model: model || 'deepseek-chat',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
+        max_tokens: 16384,
       },
       {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -154,9 +161,10 @@ app.post('/api/mistral', async (req, res) => {
     const response = await axios.post(
       'https://api.mistral.ai/v1/chat/completions',
       {
-        model: model || 'mistral-tiny',
+        model: model || 'mistral-small-latest',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
+        max_tokens: 16384,
       },
       {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -179,7 +187,14 @@ app.post('/api/ollama', async (req, res) => {
     const ollamaURL = baseURL || 'http://localhost:11434';
     const response = await axios.post(
       `${ollamaURL}/api/generate`,
-      { model: model || 'llama3.2', prompt, stream: false },
+      {
+        model: model || 'llama3.2',
+        prompt,
+        stream: false,
+        options: {
+          num_predict: 16384,
+        }
+      },
       { headers: { 'Content-Type': 'application/json' }, timeout: 180000 }
     );
     const text = response.data.response || '';

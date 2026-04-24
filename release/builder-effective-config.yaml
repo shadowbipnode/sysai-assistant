@@ -31,7 +31,7 @@ linux:
       arch:
         - x64
   category: Development
-  icon: build-resources/icons
+  icon: build-resources/icons/512x512.png
   synopsis: AI-Powered Linux Sysadmin Toolkit
   description: SysAI - Analyze logs, generate commands, audit security, and troubleshoot Linux systems with AI assistance.
   desktop:
