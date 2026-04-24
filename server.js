@@ -1,7 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
+import { exec } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -114,6 +119,22 @@ app.post('/api/ollama', async (req, res) => {
   }
 });
 
+// ssh-audit
+app.post('/api/ssh-audit', async (req, res) => {
+  const { host, port = 22 } = req.body;
+  
+  const safeHost = host.replace(/[^a-zA-Z0-9.-]/g, '');
+  const safePort = String(port).replace(/[^0-9]/g, '');
+  
+  const sshAuditPath = join(__dirname, 'bin', 'ssh-audit');
+  const command = `${sshAuditPath} -p ${safePort} ${safeHost}`;
+  
+  exec(command, { timeout: 30000 }, (error, stdout, stderr) => {
+    // ssh-audit restituisce exit code 3 quando trova vulnerabilità
+    // Non è un vero errore, restituiamo l'output comunque
+    res.json({ output: stdout || stderr });
+  });
+});
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 Proxy server running on http://localhost:${PORT}`);

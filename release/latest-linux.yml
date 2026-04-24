@@ -1,0 +1,8 @@
+version: 0.0.0
+files:
+  - url: sysai-assistant-0.0.0.x86_64.rpm
+    sha512: lHG4KwKXiE7SghROjggwGN4Y6SkWp0gh/UxpmP43LX0Ofmp0tYsxDX9KoNcgraaqQEDTVFY30FJal9EcPdmuxQ==
+    size: 89223725
+path: sysai-assistant-0.0.0.x86_64.rpm
+sha512: lHG4KwKXiE7SghROjggwGN4Y6SkWp0gh/UxpmP43LX0Ofmp0tYsxDX9KoNcgraaqQEDTVFY30FJal9EcPdmuxQ==
+releaseDate: '2026-04-24T07:51:46.168Z'

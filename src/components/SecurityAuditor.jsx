@@ -1,16 +1,43 @@
 import { useState } from "react";
 
-const SecurityAuditor = ({ t, onAudit, onBack }) => {
+const SecurityAuditor = ({ t, onAudit, onScan, onBack, runCommand }) => {
+  const [mode, setMode] = useState(0); // 0 = config, 1 = remote scan
   const [inputType, setInputType] = useState(0);
   const [sourceText, setSourceText] = useState("");
+  const [targetHost, setTargetHost] = useState("");
+  const [scanType, setScanType] = useState("ports"); // ports, ssl, ssh
+  const [scanPorts, setScanPorts] = useState("22,80,443,3306,5432");
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
 
   const handleAudit = async () => {
-    if (!sourceText.trim()) return;
+    if (mode === 0 && !sourceText.trim()) return;
+    if (mode === 1 && !targetHost.trim()) return;
+    
     setAnalyzing(true);
-    const inputTypeName = t.securityAuditorPage.types[inputType];
-    const response = await onAudit(inputTypeName, sourceText);
+    let response;
+    
+    if (mode === 0) {
+      const inputTypeName = t.securityAuditorPage.types[inputType];
+      response = await onAudit(inputTypeName, sourceText);
+    } else {
+      // Esegui scan locale
+      let command = "";
+      if (scanType === "ports") {
+        command = `nmap -sV --open -p ${scanPorts} ${targetHost}`;
+      } else if (scanType === "ssl") {
+        command = `sslscan --no-failed ${targetHost}`;
+      } else if (scanType === "ssh") {
+        command = `ssh-audit -p 22 ${targetHost}`;
+      }    
+      const scanResult = await runCommand(command);
+      if (scanResult.success) {
+        response = await onScan(targetHost, scanType, scanResult.output);
+      } else {
+        response = { report: `Errore scan: ${scanResult.output}`, recommendations: "Verifica che il tool sia installato" };
+      }
+    }
+    
     setResult(response);
     setAnalyzing(false);
   };
@@ -26,39 +53,133 @@ const SecurityAuditor = ({ t, onAudit, onBack }) => {
       </h2>
       <p style={{ color: "#8B95A8", fontSize: 14, marginBottom: 20 }}>{t.securityAuditorPage.subtitle}</p>
 
+      {/* Modalità */}
       <div style={{ marginBottom: 16 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-          {t.securityAuditorPage.typeLabel}
+          Modalità
         </label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {t.securityAuditorPage.types.map((type, i) => (
-            <button key={type} onClick={() => setInputType(i)} style={{
-              padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-              background: inputType === i ? "#00D4AA" : "#1A1F2E",
-              color: inputType === i ? "#0B0E14" : "#8B95A8",
-              border: `1px solid ${inputType === i ? "#00D4AA" : "#1E2535"}`,
-              cursor: "pointer",
-            }}>{type}</button>
-          ))}
+        <div style={{ display: "flex", gap: 12 }}>
+          <button onClick={() => setMode(0)} style={{
+            flex: 1, padding: "10px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+            background: mode === 0 ? "#00D4AA" : "#1A1F2E",
+            color: mode === 0 ? "#0B0E14" : "#8B95A8",
+            border: `1px solid ${mode === 0 ? "#00D4AA" : "#1E2535"}`,
+            cursor: "pointer",
+          }}>📄 Analisi Configurazione</button>
+          <button onClick={() => setMode(1)} style={{
+            flex: 1, padding: "10px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+            background: mode === 1 ? "#00D4AA" : "#1A1F2E",
+            color: mode === 1 ? "#0B0E14" : "#8B95A8",
+            border: `1px solid ${mode === 1 ? "#00D4AA" : "#1E2535"}`,
+            cursor: "pointer",
+          }}>🌐 Scan Remoto</button>
         </div>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-          {t.securityAuditorPage.sourceLabel}
-        </label>
-        <textarea
-          value={sourceText}
-          onChange={(e) => setSourceText(e.target.value)}
-          placeholder={t.securityAuditorPage.placeholder}
-          style={{
-            width: "100%", height: 180, padding: 16, borderRadius: 12,
-            background: "#131720", border: "1px solid #1E2535",
-            color: "#E8ECF4", fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
-            resize: "vertical",
-          }}
-        />
-      </div>
+      {mode === 0 && (
+        <>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
+              {t.securityAuditorPage.typeLabel}
+            </label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {t.securityAuditorPage.types.map((type, i) => (
+                <button key={type} onClick={() => setInputType(i)} style={{
+                  padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  background: inputType === i ? "#00D4AA" : "#1A1F2E",
+                  color: inputType === i ? "#0B0E14" : "#8B95A8",
+                  border: `1px solid ${inputType === i ? "#00D4AA" : "#1E2535"}`,
+                  cursor: "pointer",
+                }}>{type}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
+              {t.securityAuditorPage.sourceLabel}
+            </label>
+            <textarea
+              value={sourceText}
+              onChange={(e) => setSourceText(e.target.value)}
+              placeholder={t.securityAuditorPage.placeholder}
+              style={{
+                width: "100%", height: 180, padding: 16, borderRadius: 12,
+                background: "#131720", border: "1px solid #1E2535",
+                color: "#E8ECF4", fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+                resize: "vertical",
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {mode === 1 && (
+        <>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
+              🔍 Tipo di Scan
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setScanType("ports")} style={{
+                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
+                background: scanType === "ports" ? "#00D4AA" : "#1A1F2E",
+                color: scanType === "ports" ? "#0B0E14" : "#8B95A8",
+                border: `1px solid ${scanType === "ports" ? "#00D4AA" : "#1E2535"}`,
+                cursor: "pointer",
+              }}>🔌 Porte (nmap)</button>
+              <button onClick={() => setScanType("ssl")} style={{
+                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
+                background: scanType === "ssl" ? "#00D4AA" : "#1A1F2E",
+                color: scanType === "ssl" ? "#0B0E14" : "#8B95A8",
+                border: `1px solid ${scanType === "ssl" ? "#00D4AA" : "#1E2535"}`,
+                cursor: "pointer",
+              }}>🔒 SSL/TLS (sslscan)</button>
+              <button onClick={() => setScanType("ssh")} style={{
+                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
+                background: scanType === "ssh" ? "#00D4AA" : "#1A1F2E",
+                color: scanType === "ssh" ? "#0B0E14" : "#8B95A8",
+                border: `1px solid ${scanType === "ssh" ? "#00D4AA" : "#1E2535"}`,
+                cursor: "pointer",
+              }}>🖥️ SSH (ssh-audit)</button>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
+              🌐 IP o Dominio
+            </label>
+            <input
+              value={targetHost}
+              onChange={(e) => setTargetHost(e.target.value)}
+              placeholder="es. 192.168.1.1 o example.com"
+              style={{
+                width: "100%", padding: "12px 16px", borderRadius: 12,
+                background: "#131720", border: "1px solid #1E2535",
+                color: "#E8ECF4", fontSize: 14,
+              }}
+            />
+          </div>
+
+          {scanType === "ports" && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
+                🔌 Porte (separate da virgola)
+              </label>
+              <input
+                value={scanPorts}
+                onChange={(e) => setScanPorts(e.target.value)}
+                placeholder="22,80,443,3306,5432"
+                style={{
+                  width: "100%", padding: "12px 16px", borderRadius: 12,
+                  background: "#131720", border: "1px solid #1E2535",
+                  color: "#E8ECF4", fontSize: 14,
+                }}
+              />
+            </div>
+          )}
+        </>
+      )}
 
       <button onClick={handleAudit} style={{
         marginTop: 12, padding: "12px 28px", background: "#00D4AA", color: "#0B0E14",
@@ -77,7 +198,9 @@ const SecurityAuditor = ({ t, onAudit, onBack }) => {
               display: "flex", justifyContent: "space-between", alignItems: "center",
               padding: "10px 16px", background: "#00D4AA22",
             }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#00D4AA" }}>🛡️ AUDIT REPORT</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#00D4AA" }}>
+                {mode === 0 ? "🛡️ AUDIT REPORT" : "📡 SCAN REPORT"}
+              </span>
               <button onClick={() => navigator.clipboard.writeText(result.report)} style={{
                 background: "none", border: "1px solid #00D4AA44", borderRadius: 6,
                 color: "#00D4AA", padding: "4px 12px", fontSize: 11, cursor: "pointer",

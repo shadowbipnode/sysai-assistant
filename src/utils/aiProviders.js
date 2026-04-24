@@ -194,3 +194,41 @@ Rispondi STRETTAMENTE con questo formato JSON (nessun altro testo prima o dopo):
   "recommendations": "Raccomandazioni specifiche per risolvere ogni problema, con comandi dove necessario"
 }`;
 };
+
+// Prompt per security scan remoto
+export const buildSecurityScanPrompt = (targetHost, ports, systemProfile, lang) => {
+  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
+  const targetLang = languageMap[lang] || "english";
+  
+  return `Sei un esperto di cybersecurity. Analizza la sicurezza remota del target ${targetHost} sulle porte: ${ports}. Rispondi SOLO in ${targetLang}.
+
+Per ogni porta aperta, identifica:
+- Servizio tipico
+- Rischi di sicurezza comuni
+- Ciphers/protocolli deboli (per TLS/SSL)
+- Best practice per hardening
+
+CONTESTO SISTEMA: ${systemProfile || "Non specificato"}
+
+Rispondi STRETTAMENTE con questo formato JSON:
+{
+  "report": "Analisi dettagliata per ogni porta trovata, con rischi e vulnerabilità",
+  "recommendations": "Raccomandazioni specifiche per proteggere ogni servizio esposto"
+}`;
+};
+// Prompt per analizzare output di scan
+export const buildSecurityScanAnalysisPrompt = (targetHost, scanType, scanOutput, systemProfile, lang) => {
+  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
+  const targetLang = languageMap[lang] || "english";
+
+  return `Sei un esperto di cybersecurity. Analizza il seguente output di scan per ${targetHost} (tipo: ${scanType}) e identifica vulnerabilità, porte aperte pericolose, ciphers deboli, configurazioni obsolete. Rispondi SOLO in ${targetLang}.
+
+OUTPUT SCAN:
+${scanOutput}
+
+Rispondi STRETTAMENTE con questo formato JSON:
+{
+  "report": "Analisi dettagliata delle vulnerabilità trovate, con spiegazione dei rischi",
+  "recommendations": "Raccomandazioni specifiche per risolvere ogni problema, con comandi dove necessario"
+}`;
+};

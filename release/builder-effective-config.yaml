@@ -1,0 +1,16 @@
+directories:
+  output: release
+  buildResources: build
+appId: com.sysai.desktop
+productName: SysAI
+files:
+  - filter:
+      - dist/**/*
+      - server.js
+      - electron.js
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+electronVersion: 41.3.0

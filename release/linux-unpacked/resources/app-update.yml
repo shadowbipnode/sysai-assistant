@@ -1,0 +1,4 @@
+owner: shadowbipnode
+repo: sysai-assistant
+provider: github
+updaterCacheDirName: sysai-assistant-updater

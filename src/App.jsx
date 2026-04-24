@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import LANGS, { FREE_MODES } from "./i18n";
-import { AI_PROVIDERS, callAI, buildLogAnalysisPrompt, buildCommandPrompt, buildConfigPrompt, buildTroubleshootQuestionsPrompt, buildTroubleshootSolutionPrompt, buildScriptPrompt, buildSecurityAuditPrompt } from "./utils/aiProviders";
+import { AI_PROVIDERS, callAI, buildLogAnalysisPrompt, buildCommandPrompt, buildConfigPrompt, buildTroubleshootQuestionsPrompt, buildTroubleshootSolutionPrompt, buildScriptPrompt, buildSecurityAuditPrompt, buildSecurityScanAnalysisPrompt } from "./utils/aiProviders";
 import { fetchModelsForProvider } from "./utils/fetchModels";
 import Toast from "./components/Toast";
 import { useToast } from "./hooks/useToast";
@@ -217,6 +217,33 @@ function App() {
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
         showToast("Analisi sicurezza completata!", "success");
+        return result;
+      }
+      return { report: response, recommendations: "Verifica manuale consigliata" };
+    } catch (error) {
+      showToast(`Errore: ${error.message}`, "error");
+      return null;
+    }
+  };
+
+  const handleSecurityScan = async (targetHost, scanType, scanOutput) => {
+    const apiKey = apiKeys[defaultProvider];
+    const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
+    if (provider?.requiresApiKey && !apiKey) {
+      showToast(`Inserisci API Key per ${provider.name}`, "error");
+      setPage("settings");
+      return null;
+    }
+    
+    try {
+      const prompt = buildSecurityScanAnalysisPrompt(targetHost, scanType, scanOutput, systemProfile, lang);
+      const model = getCurrentModel();
+      const response = await callAI(defaultProvider, apiKey, prompt, model);
+      
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        showToast("Analisi scan completata!", "success");
         return result;
       }
       return { report: response, recommendations: "Verifica manuale consigliata" };
@@ -460,8 +487,22 @@ function App() {
 	{page === "scriptBuilder" && (
           <ScriptBuilder t={t} onGenerate={handleGenerateScript} onBack={() => setPage("home")} />
         )}
-	{page === "securityAuditor" && (
-          <SecurityAuditor t={t} onAudit={handleSecurityAudit} onBack={() => setPage("home")} />
+        {page === "securityAuditor" && (
+          <SecurityAuditor 
+            t={t} 
+            onAudit={handleSecurityAudit} 
+            onScan={handleSecurityScan} 
+            onBack={() => setPage("home")} 
+            runCommand={async (cmd) => {
+              try {
+                const result = await window.electron.ipcRenderer.invoke('run-command', cmd);
+                return result;
+              } catch (err) {
+                console.error('runCommand error:', err);
+                return { success: false, output: err.message };
+              }
+            }}
+          />
         )}
         {page === "settings" && (
           <Settings
