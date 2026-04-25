@@ -102,8 +102,14 @@ sudo dnf install ./sysai-assistant_1.0.0_x86_64.rpm
 ### DEB (Ubuntu, Debian, Pop!_OS, Linux Mint)
 
 ```bash
+sudo apt install ./sysai-assistant_1.0.0_amd64.deb
+```
+
+If you get a dependency error about `libxss1`:
+
+```bash
+sudo apt install libxss1
 sudo dpkg -i sysai-assistant_1.0.0_amd64.deb
-sudo apt --fix-broken install   # if needed
 ```
 
 ### AppImage (any distribution, no install needed)
