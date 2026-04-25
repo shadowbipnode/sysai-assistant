@@ -407,7 +407,7 @@ app.on('before-quit', () => {
 // LICENSE VERIFICATION (usa Node.js crypto nativo — Ed25519 OK)
 // ============================================================
 
-// ⚠️ SOSTITUISCI con la tua chiave pubblica (da: node generate-key.js --export-public)
+// License verification public key (Ed25519 — this is NOT a secret)
 const PUBLIC_KEY_B64 = 'MCowBQYDK2VwAyEA0LlC9XP6ZjVOpu2G0rW02sIetcSKjjk4qOTBLIdJIDM=';
 ipcMain.handle('verify-license', async (event, { payloadB64, signatureB64 }) => {
   try {
