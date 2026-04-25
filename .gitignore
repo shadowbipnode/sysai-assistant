@@ -47,3 +47,5 @@ Thumbs.db
 *.tmp
 audit.sh
 dev.sh
+src.zip
+start.sh
