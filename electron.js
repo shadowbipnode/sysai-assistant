@@ -408,11 +408,11 @@ app.on('before-quit', () => {
 // ============================================================
 
 // ⚠️ SOSTITUISCI con la tua chiave pubblica (da: node generate-key.js --export-public)
-const LICENSE_PUBLIC_KEY_B64 = 'MCowBQYDK2VwAyEAQ2Z+R7D8Jx3/Vjj+dOvR6LHJPzEly2oAoBGWIlydLAw=';
+const PUBLIC_KEY_B64 = 'MCowBQYDK2VwAyEA0LlC9XP6ZjVOpu2G0rW02sIetcSKjjk4qOTBLIdJIDM=';
 ipcMain.handle('verify-license', async (event, { payloadB64, signatureB64 }) => {
   try {
     // Ricostruisci la chiave pubblica dal formato SPKI/DER/Base64
-    const pubKeyDer = Buffer.from(LICENSE_PUBLIC_KEY_B64, 'base64');
+    const pubKeyDer = Buffer.from(PUBLIC_KEY_B64, 'base64');
     const publicKey = crypto.createPublicKey({
       key: pubKeyDer,
       format: 'der',

@@ -466,19 +466,21 @@ function App() {
                 </div>
               ))}
             </div>
-            <div style={{ padding: "16px", borderTop: `1px solid ${border}` }}>
-              <div style={{
-                background: `linear-gradient(135deg, ${accent}15, ${accent}08)`,
-                border: `1px solid ${accent}33`, borderRadius: 12, padding: 16,
-              }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{t.upgradePro}</div>
-                <div style={{ fontSize: 12, color: text2, marginTop: 4 }}>{t.proDesc}</div>
-                <button style={{
-                  width: "100%", marginTop: 12, padding: "8px 0", background: accent, color: "#0B0E14",
-                  border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer",
-                }}>{t.getStarted}</button>
+	    {!license.isPro && (
+              <div style={{ padding: "16px", borderTop: `1px solid ${border}` }}>
+                <div style={{
+                  background: `linear-gradient(135deg, ${accent}15, ${accent}08)`,
+                  border: `1px solid ${accent}33`, borderRadius: 12, padding: 16,
+                }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{t.upgradePro}</div>
+                  <div style={{ fontSize: 12, color: text2, marginTop: 4 }}>{t.proDesc}</div>
+		  <button onClick={() => setShowProGate(true)} style={{
+                    width: "100%", marginTop: 12, padding: "8px 0", background: accent, color: "#0B0E14",
+                    border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer",
+                  }}>{t.getStarted}</button>
+                </div>
               </div>
-            </div>
+	    )}
           </div>
         </div>
       )}
