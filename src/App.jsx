@@ -17,6 +17,8 @@ import { useLicense } from './hooks/useLicense';
 import { PRO_TOOLS } from './utils/license';
 import LicenseSettings from './components/LicenseSettings';
 import ProGate from './components/ProGate';
+import { useHistory } from './hooks/useHistory';
+import History from './components/History';
 
 
 function App() {
@@ -34,6 +36,7 @@ function App() {
   const [searchText, setSearchText] = useState("");
     // License state
   const license = useLicense();
+  const history = useHistory();
   const [showProGate, setShowProGate] = useState(false);
   
   const { toast, showToast, hideToast } = useToast();
@@ -91,6 +94,10 @@ function App() {
     return selectedModels[defaultProvider] || availableModels[defaultProvider]?.[0]?.id || "default";
   };
 
+  // ============================================================
+  // HANDLERS CON HISTORY
+  // ============================================================
+
   const handleAnalyzeLog = async (logText, selectedService) => {
     const apiKey = apiKeys[defaultProvider];
     const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
@@ -111,9 +118,91 @@ function App() {
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
         showToast("Analisi completata!", "success");
+        history.addEntry({
+          tool: 'logAnalyzer',
+          toolName: t.modes.logAnalyzer.name,
+          toolIcon: t.modes.logAnalyzer.icon,
+          input: logText,
+          output: result,
+          provider: defaultProvider,
+          model: model,
+        });
         return result;
       }
       return { severity: "INFO", title: "Analisi", explanation: response, fix: "N/A" };
+    } catch (error) {
+      showToast(`Errore: ${error.message}`, "error");
+      return null;
+    }
+  };
+
+  const handleCraftCommand = async (cmdText) => {
+    const apiKey = apiKeys[defaultProvider];
+    const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
+    if (provider?.requiresApiKey && !apiKey) {
+      showToast(`Inserisci API Key per ${provider.name}`, "error");
+      setPage("settings");
+      return null;
+    }
+    
+    try {
+      const prompt = buildCommandPrompt(cmdText, systemProfile, lang);
+      const model = getCurrentModel();
+      const response = await callAI(defaultProvider, apiKey, prompt, model);
+      console.log("🤖 AI response:", response.substring(0, 200));
+      
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        showToast("Comando generato!", "success");
+        history.addEntry({
+          tool: 'commandCrafter',
+          toolName: t.modes.commandCrafter.name,
+          toolIcon: t.modes.commandCrafter.icon,
+          input: cmdText,
+          output: result,
+          provider: defaultProvider,
+          model: model,
+        });
+        return result;
+      }
+      return { command: response, explanation: "Comando generato" };
+    } catch (error) {
+      showToast(`Errore: ${error.message}`, "error");
+      return null;
+    }
+  };
+
+  const handleExplain = async (command) => {
+    const apiKey = apiKeys[defaultProvider];
+    const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
+    if (provider?.requiresApiKey && !apiKey) {
+      showToast(`Inserisci API Key per ${provider.name}`, "error");
+      setPage("settings");
+      return null;
+    }
+    
+    try {
+      const prompt = buildExplainPrompt(command, systemProfile, lang);
+      const model = getCurrentModel();
+      const response = await callAI(defaultProvider, apiKey, prompt, model);
+      
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        showToast("Spiegazione completata!", "success");
+        history.addEntry({
+          tool: 'explainMode',
+          toolName: t.modes.explainMode.name,
+          toolIcon: t.modes.explainMode.icon,
+          input: command,
+          output: result,
+          provider: defaultProvider,
+          model: model,
+        });
+        return result;
+      }
+      return { summary: response, lines: [], risks: null, improvements: null };
     } catch (error) {
       showToast(`Errore: ${error.message}`, "error");
       return null;
@@ -139,6 +228,15 @@ function App() {
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
         showToast("Configurazione generata!", "success");
+        history.addEntry({
+          tool: 'configGenerator',
+          toolName: t.modes.configGenerator.name,
+          toolIcon: t.modes.configGenerator.icon,
+          input: `[${configType}] ${description}`,
+          output: result,
+          provider: defaultProvider,
+          model: model,
+        });
         return result;
       }
       return { filename: "config.conf", config: response, explanation: "Configurazione generata" };
@@ -167,6 +265,15 @@ function App() {
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
         showToast("Diagnosi completata!", "success");
+        history.addEntry({
+          tool: 'troubleshooter',
+          toolName: t.modes.troubleshooter.name,
+          toolIcon: t.modes.troubleshooter.icon,
+          input: problem,
+          output: result,
+          provider: defaultProvider,
+          model: model,
+        });
         return result;
       }
       return null;
@@ -203,6 +310,15 @@ function App() {
       if (jsonMatch && jsonMatch[1]) {
         result.script = jsonMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
         showToast("Script generato!", "success");
+        history.addEntry({
+          tool: 'scriptBuilder',
+          toolName: t.modes.scriptBuilder.name,
+          toolIcon: t.modes.scriptBuilder.icon,
+          input: `[${scriptType}] ${description}`,
+          output: result,
+          provider: defaultProvider,
+          model: model,
+        });
         return result;
       }
       
@@ -217,12 +333,30 @@ function App() {
             result.filename = parsed.filename || result.filename;
             result.usage = parsed.usage || result.usage;
             showToast("Script generato!", "success");
+            history.addEntry({
+              tool: 'scriptBuilder',
+              toolName: t.modes.scriptBuilder.name,
+              toolIcon: t.modes.scriptBuilder.icon,
+              input: `[${scriptType}] ${description}`,
+              output: result,
+              provider: defaultProvider,
+              model: model,
+            });
             return result;
           }
         } catch (e) {}
       }
       
       showToast("Script generato (formato semplice)!", "success");
+      history.addEntry({
+        tool: 'scriptBuilder',
+        toolName: t.modes.scriptBuilder.name,
+        toolIcon: t.modes.scriptBuilder.icon,
+        input: `[${scriptType}] ${description}`,
+        output: result,
+        provider: defaultProvider,
+        model: model,
+      });
       return result;
     } catch (error) {
       showToast(`Errore: ${error.message}`, "error");
@@ -248,6 +382,15 @@ function App() {
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
         showToast("Analisi sicurezza completata!", "success");
+        history.addEntry({
+          tool: 'securityAuditor',
+          toolName: t.modes.securityAuditor.name,
+          toolIcon: t.modes.securityAuditor.icon,
+          input: sourceText,
+          output: result,
+          provider: defaultProvider,
+          model: model,
+        });
         return result;
       }
       return { report: response, recommendations: "Verifica manuale consigliata" };
@@ -275,6 +418,15 @@ function App() {
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
         showToast("Analisi scan completata!", "success");
+        history.addEntry({
+          tool: 'securityAuditor',
+          toolName: t.modes.securityAuditor.name,
+          toolIcon: t.modes.securityAuditor.icon,
+          input: `[${scanType}] ${targetHost}`,
+          output: result,
+          provider: defaultProvider,
+          model: model,
+        });
         return result;
       }
       return { report: response, recommendations: "Verifica manuale consigliata" };
@@ -284,60 +436,9 @@ function App() {
     }
   };
 
-  const handleExplain = async (command) => {
-    const apiKey = apiKeys[defaultProvider];
-    const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
-    if (provider?.requiresApiKey && !apiKey) {
-      showToast(`Inserisci API Key per ${provider.name}`, "error");
-      setPage("settings");
-      return null;
-    }
-    
-    try {
-      const prompt = buildExplainPrompt(command, systemProfile, lang);
-      const model = getCurrentModel();
-      const response = await callAI(defaultProvider, apiKey, prompt, model);
-      
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        showToast("Spiegazione completata!", "success");
-        return result;
-      }
-      return { summary: response, lines: [], risks: null, improvements: null };
-    } catch (error) {
-      showToast(`Errore: ${error.message}`, "error");
-      return null;
-    }
-  };
-
-  const handleCraftCommand = async (cmdText) => {
-    const apiKey = apiKeys[defaultProvider];
-    const provider = AI_PROVIDERS.find(p => p.id === defaultProvider);
-    if (provider?.requiresApiKey && !apiKey) {
-      showToast(`Inserisci API Key per ${provider.name}`, "error");
-      setPage("settings");
-      return null;
-    }
-    
-    try {
-      const prompt = buildCommandPrompt(cmdText, systemProfile, lang);
-      const model = getCurrentModel();
-      const response = await callAI(defaultProvider, apiKey, prompt, model);
-      console.log("🤖 AI response:", response.substring(0, 200));
-      
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-        showToast("Comando generato!", "success");
-        return result;
-      }
-      return { command: response, explanation: "Comando generato" };
-    } catch (error) {
-      showToast(`Errore: ${error.message}`, "error");
-      return null;
-    }
-  };
+  // ============================================================
+  // NAVIGATION & SETTINGS
+  // ============================================================
 
   const navigateTo = (p, modeKey) => {
     // Controllo licenza per tool PRO (che non siano FREE)
@@ -350,6 +451,7 @@ function App() {
     setPage(p);
     setSidebarOpen(false);
   };
+
   const saveSettings = () => {
     localStorage.setItem("sysai_api_keys", JSON.stringify(apiKeys));
     localStorage.setItem("sysai_selected_models", JSON.stringify(selectedModels));
@@ -373,6 +475,10 @@ function App() {
   const filteredModes = searchText
     ? modeKeys.filter((k) => t.modes[k].name.toLowerCase().includes(searchText.toLowerCase()))
     : modeKeys;
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
     <div style={{ fontFamily: "'Outfit', sans-serif", background: bg, color: text1, minHeight: "100vh" }}>
@@ -402,7 +508,7 @@ function App() {
             display: "flex", alignItems: "center", gap: 6,
             background: accentDim, padding: "4px 12px", borderRadius: 20,
             fontSize: 11, fontWeight: 500, color: accent,
-	    cursor: "pointer",
+            cursor: "pointer",
           }} onClick={() => setPage("settings")}>
             <span>🤖</span>
             <span>{getCurrentProvider()}</span>
@@ -411,7 +517,7 @@ function App() {
               {getCurrentModel().split('-').slice(0, 3).join('-')}
             </span>
           </div>
-	  <div style={{
+          <div style={{
             padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
             background: license.isPro ? '#00D4AA22' : '#FF4D6A15',
             color: license.isPro ? '#00D4AA' : '#FF4D6A',
@@ -449,7 +555,7 @@ function App() {
             <div style={{ flex: 1, padding: "12px 8px" }}>
               {[
                 { icon: "🏠", label: t.home, key: "home" },
-                { icon: "📜", label: t.history, key: "history" },
+                { icon: "📜", label: `${t.history}${history.count > 0 ? ` (${history.count})` : ''}`, key: "history" },
                 { icon: "⭐", label: t.favorites, key: "favorites" },
                 { icon: "📎", label: t.snippets, key: "snippets" },
                 { icon: "⚙", label: t.settings, key: "settings" },
@@ -466,7 +572,7 @@ function App() {
                 </div>
               ))}
             </div>
-	    {!license.isPro && (
+            {!license.isPro && (
               <div style={{ padding: "16px", borderTop: `1px solid ${border}` }}>
                 <div style={{
                   background: `linear-gradient(135deg, ${accent}15, ${accent}08)`,
@@ -474,13 +580,13 @@ function App() {
                 }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{t.upgradePro}</div>
                   <div style={{ fontSize: 12, color: text2, marginTop: 4 }}>{t.proDesc}</div>
-		  <button onClick={() => setShowProGate(true)} style={{
+                  <button onClick={() => setShowProGate(true)} style={{
                     width: "100%", marginTop: 12, padding: "8px 0", background: accent, color: "#0B0E14",
                     border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer",
                   }}>{t.getStarted}</button>
                 </div>
               </div>
-	    )}
+            )}
           </div>
         </div>
       )}
@@ -570,7 +676,7 @@ function App() {
           <Settings
             t={t}
             lang={lang}
-	    license={license}
+            license={license}
             theme={theme}
             accent={accent}
             accentDim={accentDim}
@@ -599,23 +705,63 @@ function App() {
           />
         )}
 
-        {["history", "favorites", "snippets"].includes(page) && (
+        {page === "history" && (
+          <History
+            entries={history.entries}
+            onSearch={history.searchEntries}
+            onToggleFavorite={history.toggleFavorite}
+            onDelete={history.deleteEntry}
+            onClearAll={history.clearAll}
+            onBack={() => setPage("home")}
+            accent={accent}
+            accentDim={accentDim}
+            surface={surface}
+            surface2={surface2}
+            border={border}
+            bg={bg}
+            text1={text1}
+            text2={text2}
+          />
+        )}
+
+        {page === "favorites" && (
+          <History
+            entries={history.entries}
+            onSearch={history.searchEntries}
+            onToggleFavorite={history.toggleFavorite}
+            onDelete={history.deleteEntry}
+            onClearAll={history.clearAll}
+            onBack={() => setPage("home")}
+            accent={accent}
+            accentDim={accentDim}
+            surface={surface}
+            surface2={surface2}
+            border={border}
+            bg={bg}
+            text1={text1}
+            text2={text2}
+            showFavoritesOnly={true}
+          />
+        )}
+
+        {page === "snippets" && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
-            <div style={{ fontSize: 48 }}>🔒</div>
-            <h2>Pro Feature</h2>
-            <p>{t.proDesc}</p>
+            <div style={{ fontSize: 48 }}>📎</div>
+            <h2>Coming soon</h2>
+            <p style={{ color: text2 }}>Snippet library will be available in a future update.</p>
           </div>
         )}
-            {/* ProGate Modal */}
-      <ProGate
-        show={showProGate}
-        onClose={() => setShowProGate(false)}
-        onGoToSettings={() => {
-          setShowProGate(false);
-          setPage('settings');
-        }}
-        lang={lang}
-      />
+
+        {/* ProGate Modal */}
+        <ProGate
+          show={showProGate}
+          onClose={() => setShowProGate(false)}
+          onGoToSettings={() => {
+            setShowProGate(false);
+            setPage('settings');
+          }}
+          lang={lang}
+        />
       </main>
     </div>
   );
