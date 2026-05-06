@@ -43,19 +43,39 @@ function App() {
 
   // Carica impostazioni salvate
   useEffect(() => {
-    const savedApiKeys = localStorage.getItem("sysai_api_keys");
-    const savedSelectedModels = localStorage.getItem("sysai_selected_models");
-    const savedDefaultProvider = localStorage.getItem("sysai_default_provider");
-    const savedSystemProfile = localStorage.getItem("sysai_system_profile");
-    const savedLang = localStorage.getItem("sysai_lang");
-    const savedTheme = localStorage.getItem("sysai_theme");
-    
-    if (savedApiKeys) setApiKeys(JSON.parse(savedApiKeys));
-    if (savedSelectedModels) setSelectedModels(JSON.parse(savedSelectedModels));
-    if (savedDefaultProvider) setDefaultProvider(savedDefaultProvider);
-    if (savedSystemProfile) setSystemProfile(savedSystemProfile);
-    if (savedLang) setLang(savedLang);
-    if (savedTheme) setTheme(savedTheme);
+    const loadSettings = async () => {
+      const savedSelectedModels = localStorage.getItem("sysai_selected_models");
+      const savedDefaultProvider = localStorage.getItem("sysai_default_provider");
+      const savedSystemProfile = localStorage.getItem("sysai_system_profile");
+      const savedLang = localStorage.getItem("sysai_lang");
+      const savedTheme = localStorage.getItem("sysai_theme");
+
+      // Backward compatibility: migrate old localStorage API keys into encrypted Electron storage.
+      const legacyApiKeys = localStorage.getItem("sysai_api_keys");
+      if (legacyApiKeys && window.electron?.secureStore) {
+        await window.electron.secureStore.set("sysai_api_keys", legacyApiKeys);
+        localStorage.removeItem("sysai_api_keys");
+      }
+
+      if (window.electron?.secureStore) {
+        const secureApiKeys = await window.electron.secureStore.get("sysai_api_keys");
+        if (secureApiKeys?.success && secureApiKeys.value) {
+          setApiKeys(JSON.parse(secureApiKeys.value));
+        }
+      } else if (legacyApiKeys) {
+        setApiKeys(JSON.parse(legacyApiKeys));
+      }
+
+      if (savedSelectedModels) setSelectedModels(JSON.parse(savedSelectedModels));
+      if (savedDefaultProvider) setDefaultProvider(savedDefaultProvider);
+      if (savedSystemProfile) setSystemProfile(savedSystemProfile);
+      if (savedLang) setLang(savedLang);
+      if (savedTheme) setTheme(savedTheme);
+    };
+
+    loadSettings().catch((error) => {
+      console.error("Errore caricamento impostazioni:", error);
+    });
   }, []);
 
   // Fetch modelli
@@ -112,7 +132,6 @@ function App() {
       const prompt = buildLogAnalysisPrompt(logText, serviceName, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
-      console.log("🤖 AI response:", response.substring(0, 200));
       
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -149,7 +168,6 @@ function App() {
       const prompt = buildCommandPrompt(cmdText, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
-      console.log("🤖 AI response:", response.substring(0, 200));
       
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -222,7 +240,6 @@ function App() {
       const prompt = buildConfigPrompt(description, configType, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
-      console.log("🤖 AI response:", response.substring(0, 200));
       
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -259,7 +276,6 @@ function App() {
       const prompt = buildTroubleshootPrompt(problem, previousSteps, systemProfile, lang);
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
-      console.log("🤖 AI response:", response.substring(0, 200));
       
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -452,14 +468,27 @@ function App() {
     setSidebarOpen(false);
   };
 
-  const saveSettings = () => {
-    localStorage.setItem("sysai_api_keys", JSON.stringify(apiKeys));
-    localStorage.setItem("sysai_selected_models", JSON.stringify(selectedModels));
-    localStorage.setItem("sysai_default_provider", defaultProvider);
-    localStorage.setItem("sysai_system_profile", systemProfile);
-    localStorage.setItem("sysai_lang", lang);
-    localStorage.setItem("sysai_theme", theme);
-    showToast("Impostazioni salvate!", "success");
+  const saveSettings = async () => {
+    try {
+      const serializedApiKeys = JSON.stringify(apiKeys);
+      if (window.electron?.secureStore) {
+        const saved = await window.electron.secureStore.set("sysai_api_keys", serializedApiKeys);
+        if (!saved?.success) throw new Error(saved?.error || "Secure storage unavailable");
+        localStorage.removeItem("sysai_api_keys");
+      } else {
+        // Browser/dev fallback only. Electron builds use encrypted safeStorage.
+        localStorage.setItem("sysai_api_keys", serializedApiKeys);
+      }
+
+      localStorage.setItem("sysai_selected_models", JSON.stringify(selectedModels));
+      localStorage.setItem("sysai_default_provider", defaultProvider);
+      localStorage.setItem("sysai_system_profile", systemProfile);
+      localStorage.setItem("sysai_lang", lang);
+      localStorage.setItem("sysai_theme", theme);
+      showToast("Impostazioni salvate!", "success");
+    } catch (error) {
+      showToast(`Errore salvataggio impostazioni: ${error.message}`, "error");
+    }
   };
 
   const bg = theme === "dark" ? "#0B0E14" : "#F5F6F8";

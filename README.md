@@ -3,17 +3,15 @@
 </p>
 
 <h1 align="center">SysAI</h1>
-<p align="center"><strong>AI-Powered Linux Sysadmin Toolkit</strong></p>
-<p align="center">
-  <em>Built by a sysadmin, for sysadmins.</em>
-</p>
+<p align="center"><strong>Local-first AI toolkit for Linux sysadmins</strong></p>
+<p align="center"><em>Built by a sysadmin, for sysadmins.</em></p>
 
 <p align="center">
   <a href="#-why-sysai">Why SysAI</a> •
   <a href="#-features">Features</a> •
+  <a href="#-privacy-model">Privacy</a> •
   <a href="#-installation">Installation</a> •
   <a href="#-get-an-api-key">API Keys</a> •
-  <a href="#-beta-program">Beta Program</a> •
   <a href="#-architecture">Architecture</a>
 </p>
 
@@ -21,279 +19,273 @@
 
 ## ❓ Why SysAI
 
-SysAI is **not** another AI chatbot. It's a toolkit with 7 specialized tools, each designed around a real sysadmin workflow.
+SysAI is not a generic chatbot. It is a Linux sysadmin toolkit with specialized workflows for logs, commands, configurations, scripts, troubleshooting and security checks.
 
-| The ChatGPT way | The SysAI way |
+| Generic AI chat | SysAI |
 |---|---|
-| Open browser, navigate to ChatGPT | Open SysAI from your desktop |
-| Type a long prompt explaining context | Pick a tool, paste your log/command/config |
-| Read a wall of text, find the command | Get the fix command, click copy |
-| Copy-paste between browser and terminal | Already formatted and ready to use |
-| Your data goes through third-party servers | Your API key, your machine, your data |
+| Open a browser and write a long prompt | Open the desktop app and choose the right tool |
+| Explain your environment every time | Save a system profile once |
+| Read a long answer and extract the command | Get structured output ready to copy |
+| Manually ask for risks and rollback | Commands are prompted to include warnings, verification and rollback notes |
+| Use a single provider | Bring your own Gemini, OpenAI, Claude, DeepSeek, Mistral or Ollama |
 
-**BYOK (Bring Your Own Key):** SysAI never touches a remote server. Your API keys stay on your machine. All AI calls go directly from your app to the provider you choose. Zero telemetry, zero tracking, zero cloud.
+**BYOK — Bring Your Own Key.** SysAI does not use a SysAI cloud account and does not send your data to a SysAI server. AI requests go directly from your machine to the provider you configure. With Ollama, requests can run fully locally.
 
 ---
 
 ## ⚡ Features
 
-### 🔓 Free Tools
+### 🔓 Free tools
 
-**📋 Log Analyzer**
-Paste logs from syslog, journalctl, nginx, docker, LND, Bitcoin Core, or any service. SysAI identifies the root cause, severity level (LOW/MEDIUM/HIGH/CRITICAL), and gives you copy-paste fix commands.
+**📋 Log Analyzer**  
+Paste logs from syslog, journalctl, nginx, Docker, LND, Bitcoin Core or any service. SysAI identifies likely root causes, severity and suggested fixes.
 
-**⌨️ Command Crafter**
-Describe what you need in plain language — *"find files larger than 100MB modified this week"* — and get the exact command with a flag-by-flag explanation.
+**⌨️ Command Crafter**  
+Describe what you need in plain language and get an exact Linux command with explanation, warnings, sudo/destructive flags, verification and rollback notes when applicable.
 
-**🔍 Explain Mode**
-Paste a command or script you found online or inherited from a colleague. Get a line-by-line breakdown of what it does, plus security warnings if anything is dangerous.
+**🔍 Explain Mode**  
+Paste a command or script and get a line-by-line explanation with risk notes and possible improvements.
 
-### 🔐 Pro Tools
+### 🔐 Pro tools
 
-**⚙️ Config Generator**
-Describe your setup in words and get production-ready, commented, security-hardened configs for nginx, Apache, iptables, Docker Compose, systemd, SSH, fail2ban, and more.
+**⚙️ Config Generator**  
+Generate production-oriented configs for nginx, Apache, iptables, Docker Compose, systemd, SSH, fail2ban and more.
 
-**🔧 Troubleshooter**
-Describe a problem and get guided step-by-step diagnosis. SysAI asks targeted questions, suggests diagnostic commands, and narrows down the issue interactively.
+**🔧 Troubleshooter**  
+Describe a problem and get a guided diagnostic path with concrete commands and next steps.
 
-**📜 Script Builder**
-Describe an automation task and get a complete bash or Python script with error handling, logging, input validation, and usage instructions.
+**📜 Script Builder**  
+Generate bash or Python scripts with logging, validation, error handling and usage notes.
 
-**🛡️ Security Auditor**
-Paste a config or describe your setup. Get a security audit with severity ratings, specific vulnerabilities, fix commands, and CIS/NIST compliance notes. Includes three built-in network scanners:
+**🛡️ Security Auditor**  
+Audit configs or system descriptions and receive findings with severity, remediation steps and notes. Includes built-in scanners:
 
 - **Port Scanner** — native Node.js implementation, no nmap required
 - **TLS/SSL Checker** — native Node.js implementation, no sslscan required
-- **SSH Audit** — bundled standalone binary, analyzes SSH server security
+- **SSH Audit** — bundled ssh-audit binary/script support where available
 
-### 🌐 Multi-Provider AI (Bring Your Own Key)
+### 🌐 AI providers
 
-| Provider | Free tier? | Notes |
-|---|---|---|
-| **Google Gemini** | ✅ Yes | **Recommended to start.** Free key with 15 req/min, 1M tokens/min |
-| **OpenAI GPT** | ❌ Paid | GPT-4o-mini is very affordable (~$0.15/1M tokens) |
-| **Anthropic Claude** | ❌ Paid | Excellent for complex scripts and configs |
-| **DeepSeek** | ✅ Very cheap | Good budget alternative |
-| **Mistral** | ✅ Limited free tier | European provider |
-| **Ollama** | ✅ Completely free | Runs locally on your machine, fully offline |
-
-You can configure multiple providers simultaneously and set a different default for each tool.
+| Provider | API key | Notes |
+|---|---:|---|
+| Google Gemini | Yes | Good default for free/low-cost testing |
+| OpenAI | Yes | Good general-purpose models |
+| Anthropic Claude | Yes | Strong for complex reasoning and scripts |
+| DeepSeek | Yes | Budget-friendly option |
+| Mistral AI | Yes | European provider |
+| Ollama | No | Local/offline models on your machine |
 
 ### 🌍 Languages
 
-Full UI and AI responses in: 🇬🇧 English · 🇮🇹 Italiano · 🇫🇷 Français · 🇩🇪 Deutsch · 🇪🇸 Español
+UI and AI response language support: English, Italiano, Français, Deutsch, Español.
 
 ### 🎨 Themes
 
-Dark mode and Light mode, following your preference.
+Dark and light mode.
+
+---
+
+## 🔒 Privacy model
+
+SysAI is local-first, not cloud-hosted.
+
+- No SysAI account is required.
+- No telemetry is intentionally collected by SysAI.
+- No request is sent to a SysAI backend.
+- API keys are stored locally.
+- In Electron builds, API keys are stored through Electron `safeStorage` in the app user data directory.
+- In browser/dev fallback mode only, API keys may fall back to browser `localStorage`.
+- AI prompts and data are sent to the AI provider you configure, unless you use a local Ollama model.
+
+Important: third-party AI providers have their own privacy and data-retention policies. SysAI avoids being a middleman, but it cannot control the provider selected by the user.
 
 ---
 
 ## 📦 Installation
 
-**Requirements:** Any 64-bit Linux distribution + at least one AI API key.
+**Requirements:** 64-bit Linux and at least one AI provider, unless you use Ollama locally.
 
-### RPM (Fedora, RHEL, Rocky Linux, CentOS, AlmaLinux)
-
-```bash
-sudo dnf install ./sysai-assistant_1.0.0_x86_64.rpm
-```
-
-### DEB (Ubuntu, Debian, Pop!_OS, Linux Mint)
+### RPM — Fedora, RHEL, Rocky Linux, CentOS, AlmaLinux
 
 ```bash
-sudo apt install ./sysai-assistant_1.0.0_amd64.deb
+sudo dnf install ./sysai-assistant_1.1.0-beta_x86_64.rpm
 ```
 
-If you get a dependency error about `libxss1`:
+### DEB — Ubuntu, Debian, Pop!_OS, Linux Mint
 
 ```bash
-sudo apt install libxss1
-sudo dpkg -i sysai-assistant_1.0.0_amd64.deb
+sudo apt install ./sysai-assistant_1.1.0-beta_amd64.deb
 ```
 
-### AppImage (any distribution, no install needed)
+If your distro reports missing dependencies, install them first, then retry the package install.
+
+### AppImage — most Linux distributions
 
 ```bash
-chmod +x SysAI-1.0.0.AppImage
-./SysAI-1.0.0.AppImage
+chmod +x sysai-assistant_1.1.0-beta_x86_64.AppImage
+./sysai-assistant_1.1.0-beta_x86_64.AppImage
 ```
 
-### First Launch
+### First launch
 
-1. Open SysAI from your application menu
-2. Go to **Settings → AI Providers**
-3. Paste your API key (Gemini recommended — it's free)
-4. Choose a tool and start working
-
-### Uninstall
-
-```bash
-sudo rpm -e sysai-assistant      # RPM
-sudo dpkg -r sysai-assistant     # DEB
-```
+1. Open SysAI from your application menu.
+2. Go to **Settings → AI Providers**.
+3. Add at least one API key, or install/start Ollama.
+4. Select your default provider/model.
+5. Add a short system profile, for example: `Ubuntu 24.04 VPS, Docker, nginx, Bitcoin Core, LND`.
 
 ---
 
-## 🔑 Get an API Key
+## 🔑 Get an API key
 
-You need at least one API key to use SysAI. Here's the easiest way to get started for free:
+### Google Gemini
 
-### Google Gemini (Free — recommended to start)
+1. Go to Google AI Studio.
+2. Create an API key.
+3. Paste it in **SysAI → Settings → Google Gemini**.
 
-1. Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-2. Sign in with your Google account
-3. Click **"Create API key"**
-4. Copy the key
-5. In SysAI → Settings → Google Gemini → paste the key
-
-The free tier gives you 15 requests per minute and 1 million tokens per minute — more than enough for daily sysadmin work.
-
-### Ollama (Free — 100% offline, no API key needed)
+### Ollama — local/offline
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull llama3.2
+ollama serve
 ```
 
-In SysAI Settings → Ollama, the default URL `http://localhost:11434` works out of the box. No API key needed. Everything stays on your machine.
+SysAI expects Ollama at:
+
+```text
+http://localhost:11434
+```
 
 ### Other providers
 
-- **OpenAI:** [platform.openai.com/api-keys](https://platform.openai.com/api-keys) (requires credit)
-- **Anthropic Claude:** [console.anthropic.com](https://console.anthropic.com) (requires credit)
-- **DeepSeek:** [platform.deepseek.com](https://platform.deepseek.com)
-- **Mistral:** [console.mistral.ai](https://console.mistral.ai)
+Create a key from the official console of OpenAI, Anthropic, DeepSeek or Mistral and paste it in Settings.
 
 ---
 
-## 🧪 Beta Program
+## 🧪 Beta program
 
-**SysAI is currently in open beta!**
+SysAI is currently in beta. Feedback is especially useful on:
 
-We're looking for Linux sysadmins and enthusiasts to test SysAI across different distributions and setups. During the beta period, license keys are generated and sent manually.
+- installation on different Linux distributions;
+- quality of generated commands/configs/scripts;
+- scanner behavior;
+- API provider/model behavior;
+- UI/UX issues;
+- features worth paying for.
 
-### What beta testers get
+Contact:
 
-- **Full Pro access** — all 7 tools unlocked, all providers, all languages
-- **Direct feedback channel** — your suggestions shape the product
-- **Free permanent Pro license** at launch as a thank-you
-
-### How to join
-
-1. Download the latest release from the [Releases](https://github.com/shadowbipnode/sysai-assistant/releases) page
-2. Install it on your Linux machine
-3. Request a beta license key through one of these channels:
-
-   📧 **Email:** [shadowbip@proton.me](mailto:shadowbip@proton.me)
-
-   🟣 **Nostr:** `npub1yag9ggwzdrekxput74qq66p88wv8r68r2f3lm3znycqqyh408ufs7htp3e`
-
-   Please include your **distribution** (e.g. Ubuntu 24.04, Rocky 9, Fedora 40) and a brief description of your use case.
-
-4. You'll receive a license key — paste it in **Settings → License → Activate**
-5. Use SysAI in your daily workflow and share your feedback
-
-> **Note:** During the beta phase, license keys are sent manually. An automated system is coming soon.
-
-### What we need feedback on
-
-- Does it install and run correctly on your distro?
-- Do all 7 tools produce useful, actionable results?
-- Do the built-in scanners (port scan, TLS check, SSH audit) work?
-- Which AI provider works best for you?
-- What feature is missing? What would make you pay for this?
-- Any bugs, crashes, or UI issues?
-
-You can share feedback by opening a [GitHub Issue](https://github.com/shadowbipnode/sysai-assistant/issues) or reaching out via the contacts above.
+- Email: `shadowbip@proton.me`
+- Nostr: `npub1yag9ggwzdrekxput74qq66p88wv8r68r2f3lm3znycqqyh408ufs7htp3e`
+- GitHub Issues: use the repository issue tracker.
 
 ---
 
 ## 🏗️ Architecture
 
-```
+```text
 ┌──────────────────────────────────────────┐
-│            SysAI (Electron)              │
+│            SysAI — Electron              │
 │                                          │
 │  ┌────────────┐    ┌──────────────────┐  │
 │  │  React UI  │    │  electron.js     │  │
-│  │  (renderer)│    │  (main process)  │  │
+│  │  renderer  │◄──►│  main process    │  │
 │  │            │    │                  │  │
-│  │  7 tools   │◄──►│  IPC whitelist   │  │
-│  │  Settings  │    │  Port scanner    │  │
-│  │  i18n (5)  │    │  TLS checker     │  │
-│  │  License   │    │  SSH audit bin   │  │
-│  └─────┬──────┘    │  License verify  │  │
+│  │  Tools     │    │  IPC whitelist   │  │
+│  │  Settings  │    │  safeStorage     │  │
+│  │  i18n      │    │  port scanner    │  │
+│  │  License   │    │  TLS checker     │  │
+│  └─────┬──────┘    │  ssh-audit       │  │
 │        │           └──────────────────┘  │
-│  ┌─────┴──────┐                          │
-│  │ server.js  │  Express proxy (:3001)   │
-│  │ CORS:local │  API key → provider      │
+│        │                                 │
+│  ┌─────▼──────┐                          │
+│  │ server.js  │  Local Express proxy     │
+│  │ 127.0.0.1  │  Provider API calls      │
 │  └─────┬──────┘                          │
 └────────┼─────────────────────────────────┘
-         │ HTTPS (your API key, direct)
-    ┌────┴─────┐
-    │ Gemini / │
-    │ OpenAI / │  No middleman.
-    │ Claude / │  Your key, your data.
-    │ Ollama   │
-    └──────────┘
+         │ HTTPS / local HTTP
+         ▼
+   AI provider selected by the user
+   Gemini / OpenAI / Claude / DeepSeek / Mistral / Ollama
 ```
 
-**Security:**
-- Electron with `contextIsolation: true` and `sandbox: true`
-- IPC channel whitelist — no arbitrary command execution
-- CORS restricted to localhost and file:// origins
-- API keys stored in browser localStorage, never transmitted elsewhere
-- License verification via Ed25519 cryptographic signatures
-- Input sanitization on all scan targets
+Security choices:
+
+- Electron `contextIsolation: true` and `sandbox: true`
+- IPC channel whitelist
+- no arbitrary shell command execution from the renderer
+- `ssh-audit` executed through `execFile`, not shell string interpolation
+- API keys encrypted locally with Electron `safeStorage` where available
+- scan targets sanitized before execution
+- license verification with Ed25519 signatures
 
 ---
 
-## 🗺️ Roadmap
-
-- [x] 7 AI-powered sysadmin tools
-- [x] 6 AI providers with BYOK
-- [x] 5 languages
-- [x] Built-in security scanners (port, TLS, SSH)
-- [x] Dark / Light theme
-- [x] License system with Ed25519 signatures
-- [ ] Command history with search
-- [ ] Favorites & snippet library
-- [ ] Export to file (.sh, .conf, .md)
-- [ ] Keyboard shortcuts
-- [ ] Auto-update
-- [ ] Android app
-
----
-
-## 🛠️ Build from Source
+## 🛠️ Build from source
 
 ```bash
 git clone https://github.com/shadowbipnode/sysai-assistant.git
 cd sysai-assistant
 npm install
-npm run electron:dev          # development mode
-npm run electron:build:all    # build .deb + .rpm + AppImage
+npm run electron:dev
 ```
 
-Build output will be in the `release/` directory.
+Build packages:
+
+```bash
+npm run electron:build:all
+```
+
+Output is generated in `release/`.
+
+### Clean project archive
+
+Do not include local dependencies, build artifacts, git metadata or private licensing tools in a shared archive:
+
+```bash
+zip -r sysai-assistant-clean.zip . \
+  -x "node_modules/*" \
+     ".git/*" \
+     "dist/*" \
+     "release/*" \
+     "tools/*" \
+     "src/src.zip"
+```
+
+---
+
+## 🗺️ Roadmap
+
+- [x] 7 sysadmin AI tools
+- [x] multiple AI providers with BYOK
+- [x] multilingual UI and responses
+- [x] built-in port/TLS/SSH scanners
+- [x] dark/light theme
+- [x] license verification
+- [x] command history
+- [x] safer command-prompt schema with verification/rollback fields
+- [x] encrypted local API-key storage in Electron builds
+- [ ] export to `.sh`, `.conf`, `.md`
+- [ ] favorites/snippet library
+- [ ] keyboard shortcuts
+- [ ] auto-update
+- [ ] dedicated Bitcoin/Lightning node operator profile
+- [ ] Bitcoin Core/LND/Tor/nginx log analyzers
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Fork the repo, create a branch, make your changes, and open a Pull Request.
-
-If you find a bug or have a feature request, please open a [GitHub Issue](https://github.com/shadowbipnode/sysai-assistant/issues).
+Contributions are welcome. Fork the repository, create a branch and open a pull request. For bugs or feature requests, open a GitHub Issue.
 
 ---
 
 ## 📄 License
 
-[MIT](LICENSE) — free to use, modify, and distribute.
+[MIT](LICENSE)
 
 ---
 
-<p align="center">
-  Built with ⚡ by a sysadmin, for sysadmins.
-</p>
+<p align="center">Built with ⚡ by a sysadmin, for sysadmins.</p>

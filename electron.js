@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const { spawn, exec, execFile } = require('child_process');
 const net = require('net');
@@ -273,35 +273,38 @@ async function tlsCheck(host, port = 443) {
  * Esegue ssh-audit usando il binario incluso o quello di sistema
  */
 async function sshAudit(host, port = 22) {
-  const safeHost = host.replace(/[^a-zA-Z0-9.\-:]/g, '');
-  const safePort = String(port).replace(/[^0-9]/g, '') || '22';
+  const safeHost = String(host || '').replace(/[^a-zA-Z0-9.\-:]/g, '');
+  const safePort = String(port || 22).replace(/[^0-9]/g, '') || '22';
 
-  // Prova prima il binario incluso
+  if (!safeHost) {
+    return { success: false, output: 'Invalid SSH target' };
+  }
+
   const sshAuditBin = getBinPath('ssh-audit');
+  const args = ['-p', safePort, safeHost];
+  const options = { timeout: 30000, maxBuffer: 5 * 1024 * 1024 };
 
   return new Promise((resolve) => {
-    // Prova come binario diretto
-    const command = `"${sshAuditBin}" -p ${safePort} ${safeHost}`;
-
-    exec(command, { timeout: 30000, maxBuffer: 5 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error && !stdout && !stderr) {
-        // Il binario non funziona, prova come script Python
-        const pythonCmd = `python3 "${sshAuditBin}" -p ${safePort} ${safeHost}`;
-        exec(pythonCmd, { timeout: 30000, maxBuffer: 5 * 1024 * 1024 }, (err2, stdout2, stderr2) => {
-          if (stdout2 || stderr2) {
-            resolve({ success: true, output: stdout2 || stderr2 });
-          } else {
-            resolve({
-              success: false,
-              output: 'ssh-audit non trovato. Installalo con: pip3 install ssh-audit',
-              fallback: true,
-            });
-          }
-        });
-      } else {
-        // ssh-audit ritorna exit code 3 per vulnerabilità trovate - è OK
+    execFile(sshAuditBin, args, options, (error, stdout, stderr) => {
+      if (!error || stdout || stderr) {
+        // ssh-audit may return a non-zero exit code when findings are present.
         resolve({ success: true, output: stdout || stderr });
+        return;
       }
+
+      // Fallback for environments where ssh-audit is a Python script instead of a native binary.
+      execFile('python3', [sshAuditBin, ...args], options, (pythonError, pythonStdout, pythonStderr) => {
+        if (pythonStdout || pythonStderr) {
+          resolve({ success: true, output: pythonStdout || pythonStderr });
+          return;
+        }
+
+        resolve({
+          success: false,
+          output: 'ssh-audit is not available or could not be executed on this system.',
+          fallback: true,
+        });
+      });
     });
   });
 }
@@ -354,6 +357,77 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
   }
 });
 
+// Secure local storage for secrets (API keys)
+const SECURE_STORE_FILE = path.join(app.getPath('userData'), 'secure-store.json');
+
+function readSecureStore() {
+  try {
+    if (!fs.existsSync(SECURE_STORE_FILE)) return {};
+    return JSON.parse(fs.readFileSync(SECURE_STORE_FILE, 'utf8'));
+  } catch (error) {
+    console.error('[SecureStore] Read error:', error.message);
+    return {};
+  }
+}
+
+function writeSecureStore(store) {
+  fs.mkdirSync(path.dirname(SECURE_STORE_FILE), { recursive: true });
+  fs.writeFileSync(SECURE_STORE_FILE, JSON.stringify(store, null, 2), { mode: 0o600 });
+}
+
+ipcMain.handle('secure-store:set', async (event, { key, value }) => {
+  if (typeof key !== 'string' || !key.startsWith('sysai_')) {
+    return { success: false, error: 'Invalid secure-store key' };
+  }
+
+  try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return { success: false, error: 'OS encryption is not available' };
+    }
+
+    const store = readSecureStore();
+    const encrypted = safeStorage.encryptString(String(value || '')).toString('base64');
+    store[key] = encrypted;
+    writeSecureStore(store);
+    return { success: true };
+  } catch (error) {
+    console.error('[SecureStore] Set error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('secure-store:get', async (event, key) => {
+  if (typeof key !== 'string' || !key.startsWith('sysai_')) {
+    return { success: false, error: 'Invalid secure-store key' };
+  }
+
+  try {
+    const store = readSecureStore();
+    if (!store[key]) return { success: true, value: null };
+    const value = safeStorage.decryptString(Buffer.from(store[key], 'base64'));
+    return { success: true, value };
+  } catch (error) {
+    console.error('[SecureStore] Get error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('secure-store:delete', async (event, key) => {
+  if (typeof key !== 'string' || !key.startsWith('sysai_')) {
+    return { success: false, error: 'Invalid secure-store key' };
+  }
+
+  try {
+    const store = readSecureStore();
+    delete store[key];
+    writeSecureStore(store);
+    return { success: true };
+  } catch (error) {
+    console.error('[SecureStore] Delete error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
 // Versione app
 ipcMain.handle('get-app-version', () => {
   return {
@@ -398,11 +472,6 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   stopProxy();
 });
-// ============================================================
-// AGGIUNGI QUESTO BLOCCO nel tuo electron.js
-// Mettilo DOPO gli altri ipcMain.handle e PRIMA di app.whenReady()
-// ============================================================
-
 // ============================================================
 // LICENSE VERIFICATION (usa Node.js crypto nativo — Ed25519 OK)
 // ============================================================

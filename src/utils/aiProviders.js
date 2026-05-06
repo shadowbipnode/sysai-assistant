@@ -127,6 +127,8 @@ RESPONSE RULES:
 - Always provide exact commands, not generic advice
 - Include command explanations with comments
 - Flag any destructive commands with warnings
+- Prefer reversible, least-privilege operations
+- When giving commands, include verification steps and rollback notes whenever possible
 - Consider the system context when giving recommendations`;
 }
 
@@ -171,6 +173,10 @@ Respond STRICTLY with this JSON format (no other text before or after):
   "command": "the exact command to run",
   "explanation": "What each part of the command does, flag by flag",
   "warning": "Any risks or side effects (null if safe)",
+  "requires_sudo": true,
+  "destructive": false,
+  "verification": "command to verify the result",
+  "rollback": "rollback command or null if not applicable",
   "alternatives": "Alternative approaches if any (null if none)"
 }`;
 }
