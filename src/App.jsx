@@ -393,18 +393,27 @@ function App() {
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       
-      // Risposta di fallback
-      let result = {
-        filename: "script.sh",
-        script: response.length > 200 ? response.substring(0, 200) + "\n# ... (script troncato)" : response,
-        usage: "chmod +x script.sh && ./script.sh",
-        dependencies: "bash"
-      };
-      
-      // Prova a estrarre JSON pulito
-      const jsonMatch = response.match(/\{[^{}]*"script"\s*:\s*"([^"]*)"[^{}]*\}/);
-      if (jsonMatch && jsonMatch[1]) {
-        result.script = jsonMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+      const parsedScript = extractJsonObject(response);
+      if (parsedScript?.script) {
+        const result = {
+          filename: parsedScript.filename || `script.${scriptType === 'python' ? 'py' : scriptType === 'powershell' ? 'ps1' : scriptType === 'nodejs' ? 'js' : 'sh'}`,
+          script: parsedScript.script,
+          usage: parsedScript.usage || "",
+          dependencies: parsedScript.dependencies || "",
+          severity: parsedScript.severity || parsedScript.risk_level || "MEDIUM",
+          confidence: parsedScript.confidence || "MEDIUM",
+          requires_sudo: Boolean(parsedScript.requires_sudo),
+          destructive: Boolean(parsedScript.destructive),
+          detected_stack: parsedScript.detected_stack || [],
+          next_best_action: parsedScript.next_best_action || "",
+          verification_commands: parsedScript.verification_commands || [],
+          rollback_commands: parsedScript.rollback_commands || [],
+          verification: parsedScript.verification || "",
+          rollback: parsedScript.rollback || "",
+          safety_notes: parsedScript.safety_notes || "",
+          assumptions: parsedScript.assumptions || [],
+        };
+
         showToast("Script generato!", "success");
         history.addEntry({
           tool: 'scriptBuilder',
@@ -417,30 +426,15 @@ function App() {
         });
         return result;
       }
-      
-      // Cerca JSON anche se malformato
-      const start = response.indexOf('{');
-      const end = response.lastIndexOf('}');
-      if (start !== -1 && end !== -1 && end > start) {
-        try {
-          const parsed = extractJsonObject(response.substring(start, end + 1));
-          if (parsed.script) {
-            result = { ...result, ...parsed };
-            showToast("Script generato!", "success");
-            history.addEntry({
-              tool: 'scriptBuilder',
-              toolName: t.modes.scriptBuilder.name,
-              toolIcon: t.modes.scriptBuilder.icon,
-              input: `[${scriptType}] ${description}`,
-              output: result,
-              provider: defaultProvider,
-              model: model,
-            });
-            return result;
-          }
-        } catch (e) {}
-      }
-      
+
+      // Fallback: show raw response only if JSON extraction failed.
+      let result = {
+        filename: `script.${scriptType === 'python' ? 'py' : scriptType === 'powershell' ? 'ps1' : scriptType === 'nodejs' ? 'js' : 'sh'}`,
+        script: response.length > 2000 ? response.substring(0, 2000) + "\n# ... (script truncated)" : response,
+        usage: "",
+        dependencies: ""
+      };
+
       showToast("Script generato (formato semplice)!", "success");
       history.addEntry({
         tool: 'scriptBuilder',
