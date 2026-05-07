@@ -148,6 +148,9 @@ PROFESSIONAL OUTPUT RULES FOR ${toolName}:
 - Always separate evidence from assumptions.
 - Always include verification commands when commands or changes are suggested.
 - Always include rollback guidance. If no rollback is needed, say exactly: "No rollback needed for read-only checks."
+- Use arrays for command blocks: fix_commands, verification_commands, rollback_commands. Each array item must be one complete shell command or one comment line starting with #.
+- Do not compress numbered steps into one long paragraph. Keep commands line-by-line.
+- next_best_action must be a single short action or a single command, not a chain of commands.
 - Prefer read-only discovery commands before restart/change commands.
 - Do not invent service names, container names, paths, users, domains, package names, or config filenames not present in the input.
 - If a name is unknown, give discovery commands first and explain how to replace placeholders.
@@ -311,6 +314,8 @@ PLACEHOLDER RULES:
 - Avoid <service_name> in the first recommended commands when possible.
 - For unknown service names on a known port, use commands like: ss -tulpn | grep ':PORT', systemctl list-units --type=service --state=running, docker ps --format, ps aux | grep PORT.
 - If a placeholder is unavoidable, explain exactly how to replace it.
+- fix_commands, verification_commands and rollback_commands must be JSON arrays, not numbered text paragraphs.
+- Each command array item must render cleanly as a single line in a terminal-oriented code block.
 
 Respond STRICTLY with valid JSON only. No markdown outside JSON. No text before or after.
 Use this exact JSON schema:
@@ -325,9 +330,12 @@ Use this exact JSON schema:
   "next_best_action": "The single safest first action to take, preferably a command or short action",
   "evidence": ["specific log line or fact", "specific log line or fact"],
   "assumptions": ["assumption made because the log does not show X"],
-  "fix": "Step-by-step safe fix commands, one per line, with # comments. Start with read-only checks and discover unknown names before using placeholders.",
-  "verification": "Commands to verify the fix worked, one per line, with # comments",
-  "rollback": "Rollback commands or 'No rollback needed for read-only checks.'",
+  "fix_commands": ["# Step 1 - read-only discovery", "command 1", "# Step 2 - safe remediation", "command 2"],
+  "verification_commands": ["# Verify the service/result", "command"],
+  "rollback_commands": ["No rollback needed for read-only checks."],
+  "fix": "short human-readable fix summary",
+  "verification": "short verification summary",
+  "rollback": "short rollback summary",
   "prevention": "How to prevent this in the future, 1-3 practical sentences",
   "additional_logs_optional": true,
   "additional_logs_needed": ["extra log or command output. If confidence is HIGH, these are optional follow-up checks"]
@@ -366,8 +374,10 @@ Respond STRICTLY with this JSON format:
   "next_best_action": "the first safest action to take",
   "evidence": ["facts from the request that influenced the command"],
   "assumptions": ["assumptions made because details were missing"],
-  "verification": "command(s) to verify the result",
-  "rollback": "rollback command(s) or 'No rollback needed for read-only checks.'",
+  "verification_commands": ["command(s) to verify the result"],
+  "rollback_commands": ["rollback command(s) or No rollback needed for read-only checks."],
+  "verification": "short verification summary",
+  "rollback": "short rollback summary",
   "warning": "risks or side effects, or null",
   "alternatives": "alternative approach if useful, or null"
 }`;
@@ -406,8 +416,10 @@ Response MUST be in this EXACT JSON format:
   "lines": [{"line": "exact line", "explanation": "what it does"}],
   "risks": "risks or null",
   "improvements": "safer improvements or null",
-  "verification": "command(s) to verify the command had the intended effect, or null",
-  "rollback": "rollback command(s) or 'No rollback needed for read-only checks.'",
+  "verification_commands": ["command(s) to verify the command had the intended effect"],
+  "rollback_commands": ["rollback command(s) or No rollback needed for read-only checks."],
+  "verification": "short verification summary or null",
+  "rollback": "short rollback summary",
   "assumptions": ["assumptions made while interpreting the input"]
 }`;
 }
@@ -447,8 +459,10 @@ Respond STRICTLY with this JSON format:
   "requires_sudo": true,
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
   "next_best_action": "first safe action before deployment",
-  "verification": "commands to validate/test the config",
-  "rollback": "commands or steps to restore the previous config",
+  "verification_commands": ["commands to validate/test the config"],
+  "rollback_commands": ["commands or steps to restore the previous config"],
+  "verification": "short validation summary",
+  "rollback": "short rollback summary",
   "security_notes": "security considerations for this config",
   "assumptions": ["assumptions made because details were missing"],
   "additional_logs_optional": true,
@@ -497,8 +511,11 @@ Respond STRICTLY with this JSON format:
   "assumptions": ["assumptions made because details are missing"],
   "check_command": "first command to verify the diagnosis",
   "expected_output": "what the output should look like if this diagnosis is correct",
-  "fix": "step-by-step commands to fix the issue, starting with read-only checks. Do not use placeholders until after discovery commands.",
-  "verification": "commands to confirm the issue is fixed, including service/container logs when relevant",
+  "fix_commands": ["# Step 1 - read-only discovery", "command 1", "# Step 2 - safe remediation", "command 2"],
+  "verification_commands": ["# Confirm the issue is fixed", "command"],
+  "rollback_commands": ["# Restore previous state if recorded", "command or explanation"],
+  "fix": "short human-readable fix summary",
+  "verification": "short verification summary",
   "rollback": "rollback guidance. For ownership/permission changes, include a pre-change backup command such as stat/ls -ln first, or state that reliable rollback requires the recorded original UID/GID/mode.",
   "prevention": "1-3 practical prevention steps",
   "follow_up_question": "question to ask if the diagnosis is wrong, or null",
@@ -544,8 +561,10 @@ Respond STRICTLY with this JSON format:
   "destructive": false,
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
   "next_best_action": "first safe step before running the script",
-  "verification": "commands to verify script result",
-  "rollback": "rollback commands or 'No rollback needed for read-only checks.'",
+  "verification_commands": ["commands to verify script result"],
+  "rollback_commands": ["rollback commands or No rollback needed for read-only checks."],
+  "verification": "short verification summary",
+  "rollback": "short rollback summary",
   "safety_notes": "important safety notes",
   "assumptions": ["assumptions made because details were missing"]
 }`;
@@ -592,9 +611,12 @@ Respond STRICTLY with this JSON format:
     { "issue": "description", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "evidence": "evidence from input", "fix": "safe command or action" }
   ],
   "recommendations": "specific remediation recommendations with commands where appropriate",
-  "hardening": "additional hardening commands, one per line",
-  "verification": "commands to verify the remediation",
-  "rollback": "rollback commands or 'No rollback needed for read-only checks.'",
+  "hardening_commands": ["additional hardening command or comment line"],
+  "hardening": "short hardening summary",
+  "verification_commands": ["commands to verify the remediation"],
+  "rollback_commands": ["rollback commands or No rollback needed for read-only checks."],
+  "verification": "short verification summary",
+  "rollback": "short rollback summary",
   "compliance_notes": "relevant CIS/NIST recommendations if applicable",
   "assumptions": ["assumptions made because details were missing"]
 }`;
@@ -638,8 +660,10 @@ Respond STRICTLY with this JSON format:
     { "issue": "description", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "evidence": "evidence from scan", "fix": "safe command or action" }
   ],
   "recommendations": "specific recommendations with commands where appropriate",
-  "verification": "commands to verify the remediation",
-  "rollback": "rollback commands or 'No rollback needed for read-only checks.'",
+  "verification_commands": ["commands to verify the remediation"],
+  "rollback_commands": ["rollback commands or No rollback needed for read-only checks."],
+  "verification": "short verification summary",
+  "rollback": "short rollback summary",
   "assumptions": ["assumptions made because scan output is limited"],
   "additional_logs_optional": true,
   "additional_logs_needed": ["optional additional scan/output to improve confidence"]

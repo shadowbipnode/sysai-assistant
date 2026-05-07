@@ -22,7 +22,31 @@ const isEmptyText = (value) => {
   return false;
 };
 
-const commandText = (value) => Array.isArray(value) ? value.join("\n") : value;
+const splitNumberedSteps = (text) => {
+  if (typeof text !== "string") return text;
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  // Convert AI-compressed strings like "1. Do X. 2. Do Y." into readable lines.
+  if (/\b1\.\s+/.test(trimmed) && /\b2\.\s+/.test(trimmed)) {
+    return trimmed
+      .replace(/\s+(?=\d+\.\s+)/g, "\n")
+      .replace(/:\s*'/g, ":\n'");
+  }
+  return trimmed;
+};
+
+const normalizeCommandItems = (value) => {
+  const arr = asArray(value);
+  if (!arr.length) return "";
+  return arr.map((item) => {
+    if (typeof item === "object") {
+      return item.command || item.cmd || item.step || item.action || JSON.stringify(item);
+    }
+    return String(item);
+  }).map(splitNumberedSteps).filter(Boolean).join("\n");
+};
+
+const commandText = (value) => Array.isArray(value) ? normalizeCommandItems(value) : splitNumberedSteps(value);
 
 export const ResultPill = ({ label, value, color }) => {
   if (isEmptyText(value)) return null;
@@ -110,9 +134,10 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
   const rootCause = first(result.root_cause, result.cause);
   const report = first(result.report, result.audit_report);
   const recommendations = first(result.recommendations, result.hardening);
-  const fix = commandText(first(result.fix, result.remediation));
-  const verification = commandText(first(result.verification, result.verify, result.validation_commands, result.check_command));
-  const rollback = commandText(result.rollback);
+  const hardeningCommands = commandText(result.hardening_commands);
+  const fix = commandText(first(result.fix_commands, result.commands, result.fix, result.remediation));
+  const verification = commandText(first(result.verification_commands, result.verification, result.verify, result.validation_commands, result.check_command));
+  const rollback = commandText(first(result.rollback_commands, result.rollback));
   const safetyNotes = first(result.safety_notes, result.warning, result.security_notes, result.compliance_notes, result.risks);
   const prevention = first(result.prevention, result.improvements);
   const assumptions = asArray(result.assumptions);
@@ -120,7 +145,7 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
   const findings = asArray(result.findings);
   const followUps = asArray(result.additional_logs_needed || result.follow_up_checks || result.follow_up_question);
 
-  const hasProfessionalFields = normalizedSeverity || confidence || requiresSudo !== undefined || nextBestAction || summary || rootCause || report || fix || verification || rollback || evidence.length || findings.length || assumptions.length || followUps.length || safetyNotes || prevention || recommendations;
+  const hasProfessionalFields = normalizedSeverity || confidence || requiresSudo !== undefined || nextBestAction || summary || rootCause || report || fix || verification || rollback || evidence.length || findings.length || assumptions.length || followUps.length || safetyNotes || prevention || recommendations || hardeningCommands;
   if (!hasProfessionalFields) return null;
 
   return (
@@ -194,6 +219,12 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
       {recommendations && (
         <ResultSection title="RECOMMENDATIONS" accent="#FF4D6A" copyText={recommendations}>
           {textSection(recommendations)}
+        </ResultSection>
+      )}
+
+      {hardeningCommands && (
+        <ResultSection title="HARDENING COMMANDS" accent="#FF4D6A" copyText={hardeningCommands}>
+          <CodeBlock text={hardeningCommands} />
         </ResultSection>
       )}
 

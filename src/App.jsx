@@ -38,6 +38,8 @@ function App() {
   const license = useLicense();
   const history = useHistory();
   const [showProGate, setShowProGate] = useState(false);
+  const [appVersion, setAppVersion] = useState('');
+  const [updateInfo, setUpdateInfo] = useState(null);
   
   const { toast, showToast, hideToast } = useToast();
 
@@ -77,6 +79,50 @@ function App() {
       console.error("Errore caricamento impostazioni:", error);
     });
   }, []);
+
+  // App version + GitHub update checker. Offline/errors are intentionally silent.
+  useEffect(() => {
+    const loadVersionAndCheckUpdates = async () => {
+      if (!window.electron?.ipcRenderer?.invoke) return;
+
+      try {
+        const info = await window.electron.ipcRenderer.invoke('get-app-version');
+        if (info?.version) setAppVersion(info.version);
+      } catch (error) {
+        console.warn('Version info unavailable:', error.message);
+      }
+
+      try {
+        const update = await window.electron.ipcRenderer.invoke('check-for-updates');
+        if (update?.success && update.updateAvailable && update.latestVersion) {
+          const ignoredVersion = localStorage.getItem('sysai_ignored_update_version');
+          if (ignoredVersion !== update.latestVersion) {
+            setUpdateInfo(update);
+          }
+        }
+      } catch (error) {
+        console.warn('Update check unavailable:', error.message);
+      }
+    };
+
+    loadVersionAndCheckUpdates();
+  }, []);
+
+  const openReleasePage = async () => {
+    if (!updateInfo?.releaseUrl) return;
+    if (window.electron?.ipcRenderer?.invoke) {
+      await window.electron.ipcRenderer.invoke('open-external', updateInfo.releaseUrl);
+    } else {
+      window.open(updateInfo.releaseUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const dismissUpdate = () => {
+    if (updateInfo?.latestVersion) {
+      localStorage.setItem('sysai_ignored_update_version', updateInfo.latestVersion);
+    }
+    setUpdateInfo(null);
+  };
 
   // Fetch modelli
   useEffect(() => {
@@ -575,7 +621,7 @@ function App() {
                 }}>S</div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 16 }}>Sys<span style={{ color: accent }}>AI</span></div>
-                  <div style={{ fontSize: 11, color: text2 }}>v1.0.0</div>
+                  <div style={{ fontSize: 11, color: text2 }}>v{appVersion || '...'}</div>
                 </div>
               </div>
             </div>
@@ -625,6 +671,49 @@ function App() {
         }}>
           <span>{t.proDesc}</span>
           <button style={{ marginLeft: 12, background: accent, border: "none", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>{t.upgradePro}</button>
+        </div>
+      )}
+
+
+      {updateInfo?.updateAvailable && (
+        <div style={{
+          position: "sticky", top: 57, zIndex: 90,
+          background: "linear-gradient(135deg, #00D4AA20, #1A1F2E)",
+          borderBottom: `1px solid ${accent}33`,
+          padding: "10px 20px",
+        }}>
+          <div style={{
+            maxWidth: 900, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: 12, flexWrap: "wrap",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+              <span style={{ fontSize: 18 }}>⬆️</span>
+              <div>
+                <strong style={{ color: accent }}>New SysAI version available</strong>
+                <span style={{ color: text2 }}> — v{updateInfo.latestVersion}</span>
+                {updateInfo.prerelease && (
+                  <span style={{
+                    marginLeft: 8, padding: "2px 6px", borderRadius: 6,
+                    background: "#FFB02022", color: "#FFB020", fontSize: 10, fontWeight: 700,
+                  }}>BETA</span>
+                )}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button onClick={openReleasePage} style={{
+                background: accent, color: "#0B0E14", border: "none", borderRadius: 8,
+                padding: "7px 12px", fontWeight: 700, cursor: "pointer", fontSize: 12,
+              }}>
+                View release
+              </button>
+              <button onClick={dismissUpdate} style={{
+                background: "transparent", color: text2, border: `1px solid ${border}`, borderRadius: 8,
+                padding: "7px 10px", cursor: "pointer", fontSize: 12,
+              }}>
+                Ignore
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

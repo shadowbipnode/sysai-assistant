@@ -5,6 +5,7 @@ const net = require('net');
 const tls = require('tls');
 const fs = require('fs');
 const crypto = require('crypto');
+const https = require('https');
 
 let mainWindow;
 let proxyProcess;
@@ -113,6 +114,114 @@ function stopProxy() {
     proxyProcess.kill('SIGTERM');
     proxyProcess = null;
   }
+}
+
+
+// ============================================================
+// UPDATE CHECKER (GitHub Releases)
+// ============================================================
+const UPDATE_REPO_OWNER = 'shadowbipnode';
+const UPDATE_REPO_NAME = 'sysai-assistant';
+const UPDATE_API_URL = `https://api.github.com/repos/${UPDATE_REPO_OWNER}/${UPDATE_REPO_NAME}/releases?per_page=10`;
+
+function normalizeVersionTag(version) {
+  return String(version || '')
+    .trim()
+    .replace(/^v/i, '')
+    .replace(/^sysai[-_]?assistant[-_]?/i, '');
+}
+
+function parseVersion(version) {
+  const clean = normalizeVersionTag(version);
+  const [core, pre = ''] = clean.split('-', 2);
+  const parts = core.split('.').map((n) => Number.parseInt(n, 10));
+  return {
+    raw: clean,
+    major: Number.isFinite(parts[0]) ? parts[0] : 0,
+    minor: Number.isFinite(parts[1]) ? parts[1] : 0,
+    patch: Number.isFinite(parts[2]) ? parts[2] : 0,
+    prerelease: pre || '',
+  };
+}
+
+function compareVersions(a, b) {
+  const va = parseVersion(a);
+  const vb = parseVersion(b);
+  for (const key of ['major', 'minor', 'patch']) {
+    if (va[key] > vb[key]) return 1;
+    if (va[key] < vb[key]) return -1;
+  }
+
+  // Same numeric version: stable is newer than prerelease.
+  if (!va.prerelease && vb.prerelease) return 1;
+  if (va.prerelease && !vb.prerelease) return -1;
+  if (va.prerelease === vb.prerelease) return 0;
+  return va.prerelease > vb.prerelease ? 1 : -1;
+}
+
+function fetchJson(url, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': `SysAI/${app.getVersion()}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      timeout: timeoutMs,
+    }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          reject(new Error(`GitHub returned HTTP ${res.statusCode}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(body));
+        } catch (error) {
+          reject(new Error(`Invalid GitHub response: ${error.message}`));
+        }
+      });
+    });
+
+    req.on('timeout', () => {
+      req.destroy(new Error('Update check timed out'));
+    });
+    req.on('error', reject);
+  });
+}
+
+async function checkForUpdates() {
+  const currentVersion = app.getVersion();
+  const releases = await fetchJson(UPDATE_API_URL);
+
+  if (!Array.isArray(releases)) {
+    return { success: false, currentVersion, updateAvailable: false, error: 'Invalid release list' };
+  }
+
+  const newerReleases = releases
+    .filter((release) => release && !release.draft && release.tag_name)
+    .filter((release) => compareVersions(release.tag_name, currentVersion) > 0)
+    .sort((a, b) => compareVersions(b.tag_name, a.tag_name));
+
+  const latest = newerReleases[0];
+  if (!latest) {
+    return { success: true, currentVersion, updateAvailable: false };
+  }
+
+  return {
+    success: true,
+    currentVersion,
+    updateAvailable: true,
+    latestVersion: normalizeVersionTag(latest.tag_name),
+    tagName: latest.tag_name,
+    releaseName: latest.name || latest.tag_name,
+    releaseUrl: latest.html_url,
+    publishedAt: latest.published_at,
+    prerelease: Boolean(latest.prerelease),
+    body: String(latest.body || '').slice(0, 1200),
+  };
 }
 
 // ============================================================
@@ -437,6 +546,22 @@ ipcMain.handle('get-app-version', () => {
     platform: process.platform,
     arch: process.arch,
   };
+});
+
+// Controllo aggiornamenti GitHub Releases. Fallisce in modo silenzioso se offline.
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    return await checkForUpdates();
+  } catch (error) {
+    console.warn('[UpdateChecker] Check failed:', error.message);
+    return {
+      success: false,
+      currentVersion: app.getVersion(),
+      updateAvailable: false,
+      offline: true,
+      error: error.message,
+    };
+  }
 });
 
 // Apri link esterno
