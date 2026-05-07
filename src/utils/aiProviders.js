@@ -536,12 +536,21 @@ ${getProfessionalOutputContract('Script Builder')}
 TASK: Generate a complete, production-ready script.
 
 SCRIPT TYPE: ${scriptType || 'bash'}
+
+CRITICAL LANGUAGE RULE:
+- You MUST generate the script ONLY in the requested SCRIPT TYPE.
+- If SCRIPT TYPE is python, generate Python only. Do not generate Bash.
+- If SCRIPT TYPE is powershell, generate PowerShell only. Do not generate Bash.
+- If SCRIPT TYPE is bash, generate Bash only.
+- The filename extension, syntax, comments, dependencies and usage MUST match the requested SCRIPT TYPE.
+- Do not wrap the script inside another language.
+
 REQUIREMENTS:
 ${description}
 
 The script MUST include:
-- Shebang line
-- Strict mode where appropriate, e.g. set -euo pipefail for bash
+- A shebang line ONLY when appropriate for the requested script type
+- Strict mode where appropriate, e.g. set -euo pipefail for bash, but do not add Bash-specific strict mode to Python or PowerShell
 - Input validation
 - Logging
 - Helpful comments

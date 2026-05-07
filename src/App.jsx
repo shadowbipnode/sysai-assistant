@@ -160,6 +160,45 @@ function App() {
     return selectedModels[defaultProvider] || availableModels[defaultProvider]?.[0]?.id || "default";
   };
 
+  const extractJsonObject = (raw) => {
+    if (!raw || typeof raw !== "string") return null;
+
+    let text = raw.trim();
+
+    // Remove markdown fences if the model returns ```json ... ```
+    text = text.replace(/^```(?:json)?\s*/i, "").replace(/```$/i, "").trim();
+
+    const first = text.indexOf("{");
+    const last = text.lastIndexOf("}");
+    if (first === -1 || last === -1 || last <= first) return null;
+
+    let candidate = text.slice(first, last + 1);
+
+    const tryParse = (value) => {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    };
+
+    let parsed = tryParse(candidate);
+    if (parsed) return parsed;
+
+    // Common LLM issue on Windows paths: C:\Users\... creates invalid JSON escapes.
+    // Escape only backslashes that are not valid JSON escape sequences.
+    const escapedBackslashes = candidate.replace(/\\(?!["\\/bfnrtu])/g, "\\\\");
+    parsed = tryParse(escapedBackslashes);
+    if (parsed) return parsed;
+
+    // Common LLM issue: raw control characters inside strings.
+    const cleanedControls = escapedBackslashes.replace(/[\u0000-\u001F]+/g, " ");
+    parsed = tryParse(cleanedControls);
+    if (parsed) return parsed;
+
+    return null;
+  };
+
   // ============================================================
   // HANDLERS CON HISTORY
   // ============================================================
@@ -179,9 +218,8 @@ function App() {
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
+      const result = extractJsonObject(response);
+      if (result) {
         showToast("Analisi completata!", "success");
         history.addEntry({
           tool: 'logAnalyzer',
@@ -215,9 +253,8 @@ function App() {
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
+      const result = extractJsonObject(response);
+      if (result) {
         showToast("Comando generato!", "success");
         history.addEntry({
           tool: 'commandCrafter',
@@ -251,9 +288,8 @@ function App() {
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
+      const result = extractJsonObject(response);
+      if (result) {
         showToast("Spiegazione completata!", "success");
         history.addEntry({
           tool: 'explainMode',
@@ -287,9 +323,8 @@ function App() {
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
+      const result = extractJsonObject(response);
+      if (result) {
         showToast("Configurazione generata!", "success");
         history.addEntry({
           tool: 'configGenerator',
@@ -323,9 +358,8 @@ function App() {
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
+      const result = extractJsonObject(response);
+      if (result) {
         showToast("Diagnosi completata!", "success");
         history.addEntry({
           tool: 'troubleshooter',
@@ -389,7 +423,7 @@ function App() {
       const end = response.lastIndexOf('}');
       if (start !== -1 && end !== -1 && end > start) {
         try {
-          const parsed = JSON.parse(response.substring(start, end + 1));
+          const parsed = extractJsonObject(response.substring(start, end + 1));
           if (parsed.script) {
             result = { ...result, ...parsed };
             showToast("Script generato!", "success");
@@ -438,9 +472,8 @@ function App() {
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
+      const result = extractJsonObject(response);
+      if (result) {
         showToast("Analisi sicurezza completata!", "success");
         history.addEntry({
           tool: 'securityAuditor',
@@ -474,9 +507,8 @@ function App() {
       const model = getCurrentModel();
       const response = await callAI(defaultProvider, apiKey, prompt, model);
       
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
+      const result = extractJsonObject(response);
+      if (result) {
         showToast("Analisi scan completata!", "success");
         history.addEntry({
           tool: 'securityAuditor',
