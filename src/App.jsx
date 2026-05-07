@@ -549,88 +549,111 @@ function App() {
     ? modeKeys.filter((k) => t.modes[k].name.toLowerCase().includes(searchText.toLowerCase()))
     : modeKeys;
 
+  const updateAvailable = Boolean(updateInfo?.updateAvailable);
+  const updateStatusText = updateAvailable ? "Update available" : "Up to date";
+  const updateStatusColor = updateAvailable ? "#F59E0B" : "#22C55E";
+  const productSubtitle = lang === "it"
+    ? "AI toolkit locale per Linux, sicurezza e infrastruttura"
+    : "Local-first AI toolkit for Linux, security and infrastructure";
+
   // ============================================================
   // RENDER
   // ============================================================
 
   return (
-    <div style={{ fontFamily: "'Outfit', sans-serif", background: bg, color: text1, minHeight: "100vh" }}>
+    <div
+      className="sysai-shell"
+      style={{
+        fontFamily: "'Outfit', sans-serif",
+        background: bg,
+        color: text1,
+        minHeight: "100vh",
+      }}
+    >
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
 
-      <nav style={{
+      <nav className="sysai-topbar" style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 20px", background: surface, borderBottom: `1px solid ${border}`,
+        padding: "12px 22px", background: "rgba(19, 23, 32, 0.82)", borderBottom: `1px solid ${border}`,
         position: "sticky", top: 0, zIndex: 100,
+        backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
-            background: "none", border: "none", color: text2, cursor: "pointer", fontSize: 22,
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="sysai-icon-button" style={{
+            background: "rgba(255,255,255,0.03)", border: `1px solid ${border}`, borderRadius: 12,
+            color: text2, cursor: "pointer", fontSize: 20, width: 40, height: 40,
           }}>☰</button>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("home")}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+          <div style={{ display: "flex", alignItems: "center", gap: 11, cursor: "pointer" }} onClick={() => setPage("home")}>
+            <div className="sysai-logo-mark" style={{
+              width: 38, height: 38, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center",
               background: `linear-gradient(135deg, ${accent}, #00A888)`,
-              fontWeight: 700, fontSize: 14, color: "#0B0E14",
+              fontWeight: 800, fontSize: 15, color: "#081018",
+              boxShadow: `0 0 0 1px ${accent}44, 0 14px 32px ${accent}22`,
             }}>S</div>
-            <span style={{ fontWeight: 700, fontSize: 18 }}>Sys<span style={{ color: accent }}>AI</span></span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 19, letterSpacing: "-0.03em" }}>Sys<span style={{ color: accent }}>AI</span></div>
+              <div style={{ fontSize: 11, color: text2, marginTop: -1 }}>{productSubtitle}</div>
+            </div>
           </div>
         </div>
         
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div
-  style={{
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: 2,
-    background: accentDim,
-    padding: "6px 12px",
-    borderRadius: 14,
-    cursor: "pointer",
-  }}
-  onClick={() => setPage("settings")}
->
-  <div style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontSize: 11,
-    fontWeight: 500,
-    color: accent,
-  }}>
-    <span>🤖</span>
-    <span>{getCurrentProvider()}</span>
-    <span style={{ opacity: 0.5 }}>•</span>
-    <span style={{
-      maxWidth: 150,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap"
-    }}>
-      {getCurrentModel().split('-').slice(0, 3).join('-')}
-    </span>
-  </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            className="sysai-status-widget"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 3,
+              background: "linear-gradient(135deg, rgba(0,212,170,0.14), rgba(255,255,255,0.035))",
+              border: `1px solid ${accent}26`,
+              padding: "7px 13px",
+              borderRadius: 16,
+              cursor: "pointer",
+              minWidth: 215,
+            }}
+            onClick={() => setPage("settings")}
+          >
+            <div style={{
+              display: "flex", alignItems: "center", gap: 7,
+              fontSize: 11, fontWeight: 700, color: accent, width: "100%",
+            }}>
+              <span style={{ opacity: .95 }}>🤖</span>
+              <span>{getCurrentProvider()}</span>
+              <span style={{ opacity: 0.4 }}>•</span>
+              <span style={{
+                maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                color: text1, opacity: .9,
+              }}>
+                {getCurrentModel().split('-').slice(0, 3).join('-')}
+              </span>
+            </div>
 
-  <div style={{
-    fontSize: 10,
-    color: updateInfo?.updateAvailable ? "#f59e0b" : "#22c55e",
-    paddingLeft: 20,
-    fontWeight: 600,
-  }}>
-    v{appVersion || "..."} • {updateInfo?.updateAvailable ? "Update available" : "Up to date"}
-  </div>
-</div>
-          <div style={{
-            padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+            <div style={{
+              display: "flex", alignItems: "center", gap: 7,
+              fontSize: 10, color: text2, fontWeight: 700,
+            }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: 999,
+                background: updateStatusColor,
+                boxShadow: `0 0 14px ${updateStatusColor}88`,
+              }} />
+              <span style={{ color: text2 }}>v{appVersion || "..."}</span>
+              <span style={{ opacity: .35 }}>•</span>
+              <span style={{ color: updateStatusColor }}>{updateStatusText}</span>
+            </div>
+          </div>
+          <div className="sysai-license-badge" style={{
+            padding: "6px 11px", borderRadius: 999, fontSize: 11, fontWeight: 800,
             background: license.isPro ? '#00D4AA22' : '#FF4D6A15',
             color: license.isPro ? '#00D4AA' : '#FF4D6A',
-            letterSpacing: '0.05em',
+            letterSpacing: '0.08em', border: `1px solid ${license.isPro ? '#00D4AA33' : '#FF4D6A25'}`,
           }}>
             {license.loading ? '...' : license.isPro ? (license.isBeta ? 'BETA' : 'PRO') : 'FREE'}
           </div>
-          <button onClick={() => setPage("settings")} style={{
-            background: "none", border: `1px solid ${border}`, borderRadius: 8,
-            color: text2, cursor: "pointer", padding: "6px 10px", fontSize: 16,
+          <button onClick={() => setPage("settings")} className="sysai-icon-button" style={{
+            background: "rgba(255,255,255,0.03)", border: `1px solid ${border}`, borderRadius: 12,
+            color: text2, cursor: "pointer", padding: "8px 11px", fontSize: 16,
           }}>⚙</button>
         </div>
       </nav>
@@ -747,24 +770,57 @@ function App() {
         </div>
       )}
 
-      <main style={{ padding: "24px 20px", maxWidth: 900, margin: "0 auto", width: "100%" }}>
+      <main style={{ padding: "34px 22px 48px", maxWidth: 1280, margin: "0 auto", width: "100%", position: "relative" }}>
         {page === "home" && (
-          <div>
-            <div style={{ textAlign: "center", marginBottom: 32 }}>
-              <h1 style={{ fontSize: 28, fontWeight: 700 }}>{t.tagline}</h1>
-              <p style={{ color: text2, fontSize: 14 }}>{lang === "it" ? "Scegli uno strumento per iniziare" : "Choose a tool"}</p>
+          <div className="sysai-home">
+            <div className="sysai-hero" style={{ textAlign: "center", marginBottom: 30, position: "relative" }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                padding: "7px 12px", borderRadius: 999,
+                background: `linear-gradient(135deg, ${accent}18, rgba(255,255,255,0.035))`,
+                border: `1px solid ${accent}24`, color: accent,
+                fontSize: 12, fontWeight: 800, marginBottom: 16,
+              }}>
+                <span style={{ width: 7, height: 7, borderRadius: 999, background: accent, boxShadow: `0 0 18px ${accent}` }} />
+                {lang === "it" ? "Operational AI workspace" : "Operational AI workspace"}
+              </div>
+              <h1 style={{
+                fontSize: 42, lineHeight: 1.05, fontWeight: 850, letterSpacing: "-0.055em",
+                margin: "0 auto 12px", maxWidth: 760,
+              }}>{t.tagline}</h1>
+              <p style={{ color: text2, fontSize: 15, lineHeight: 1.65, maxWidth: 620, margin: "0 auto" }}>
+                {lang === "it"
+                  ? "Diagnosi strutturate, fix sicuri, rollback e verifiche per Linux, security e infrastruttura self-hosted."
+                  : "Structured diagnostics, safe fixes, rollback and verification for Linux, security and self-hosted infrastructure."}
+              </p>
             </div>
-            <input
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder={t.searchPlaceholder}
-              style={{
-                width: "100%", padding: "12px 16px", borderRadius: 12,
-                background: surface, border: `1px solid ${border}`, color: text1,
-                marginBottom: 24,
-              }}
-            />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+
+            <div className="sysai-search-shell" style={{
+              display: "flex", alignItems: "center", gap: 12,
+              width: "100%", maxWidth: 760, margin: "0 auto 28px",
+              padding: "12px 16px", borderRadius: 18,
+              background: "linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025))",
+              border: `1px solid ${border}`,
+              boxShadow: "0 24px 70px rgba(0,0,0,.20)",
+            }}>
+              <span style={{ color: accent, fontSize: 18 }}>⌕</span>
+              <input
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                style={{
+                  width: "100%", padding: "4px 0", borderRadius: 12,
+                  background: "transparent", border: "none", outline: "none", color: text1,
+                  fontSize: 14,
+                }}
+              />
+              <span style={{
+                padding: "4px 8px", borderRadius: 8, border: `1px solid ${border}`,
+                color: text2, fontSize: 10, fontWeight: 800,
+              }}>TOOLS</span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 18 }}>
               {filteredModes.map((key) => {
                 const mode = t.modes[key];
                 return (
@@ -777,6 +833,7 @@ function App() {
                     surface={surface}
                     border={border}
                     text2={text2}
+                    text1={text1}
                     onClick={() => navigateTo(key, key)}
                   />
                 );

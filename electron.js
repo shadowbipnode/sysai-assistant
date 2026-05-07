@@ -38,10 +38,11 @@ const getBinPath = (binName) => {
 // ============================================================
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: 1600,
+    height: 1000,
     minWidth: 900,
     minHeight: 600,
+    maximized: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -62,6 +63,7 @@ function createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();
     mainWindow.show();
   });
 
