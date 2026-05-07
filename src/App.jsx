@@ -577,19 +577,49 @@ function App() {
         </div>
         
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 6,
-            background: accentDim, padding: "4px 12px", borderRadius: 20,
-            fontSize: 11, fontWeight: 500, color: accent,
-            cursor: "pointer",
-          }} onClick={() => setPage("settings")}>
-            <span>🤖</span>
-            <span>{getCurrentProvider()}</span>
-            <span style={{ opacity: 0.5 }}>•</span>
-            <span style={{ maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {getCurrentModel().split('-').slice(0, 3).join('-')}
-            </span>
-          </div>
+        <div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: 2,
+    background: accentDim,
+    padding: "6px 12px",
+    borderRadius: 14,
+    cursor: "pointer",
+  }}
+  onClick={() => setPage("settings")}
+>
+  <div style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 11,
+    fontWeight: 500,
+    color: accent,
+  }}>
+    <span>🤖</span>
+    <span>{getCurrentProvider()}</span>
+    <span style={{ opacity: 0.5 }}>•</span>
+    <span style={{
+      maxWidth: 150,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
+    }}>
+      {getCurrentModel().split('-').slice(0, 3).join('-')}
+    </span>
+  </div>
+
+  <div style={{
+    fontSize: 10,
+    color: updateInfo?.updateAvailable ? "#f59e0b" : "#22c55e",
+    paddingLeft: 20,
+    fontWeight: 600,
+  }}>
+    v{appVersion || "..."} • {updateInfo?.updateAvailable ? "Update available" : "Up to date"}
+  </div>
+</div>
           <div style={{
             padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
             background: license.isPro ? '#00D4AA22' : '#FF4D6A15',
@@ -621,7 +651,7 @@ function App() {
                 }}>S</div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 16 }}>Sys<span style={{ color: accent }}>AI</span></div>
-                  <div style={{ fontSize: 11, color: text2 }}>v{appVersion || '...'}</div>
+                  <div style={{ fontSize: 11, color: updateInfo?.updateAvailable ? "#f59e0b" : "#22c55e" }}>v{appVersion || "..."} • {updateInfo?.updateAvailable ? "Update available" : "Up to date"}</div>
                 </div>
               </div>
             </div>
