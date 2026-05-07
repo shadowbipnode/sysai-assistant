@@ -3,187 +3,384 @@
 </p>
 
 <h1 align="center">SysAI</h1>
-<p align="center"><strong>Local-first AI toolkit for Linux sysadmins</strong></p>
-<p align="center"><em>Built by a sysadmin, for sysadmins.</em></p>
+
+<p align="center">
+  <strong>Operationally-aware AI workspace for Linux sysadmins and self-hosted infrastructure</strong>
+</p>
+
+<p align="center">
+  <em>Built by a sysadmin, for sysadmins.</em>
+</p>
 
 <p align="center">
   <a href="#-why-sysai">Why SysAI</a> •
+  <a href="#-what-makes-sysai-different">What makes SysAI different?</a> •
   <a href="#-features">Features</a> •
   <a href="#-privacy-model">Privacy</a> •
   <a href="#-installation">Installation</a> •
-  <a href="#-get-an-api-key">API Keys</a> •
-  <a href="#-architecture">Architecture</a>
+  <a href="#-architecture">Architecture</a> •
+  <a href="#-roadmap">Roadmap</a>
 </p>
 
 ---
 
-## ❓ Why SysAI
+# ❓ Why SysAI
 
-SysAI is not a generic chatbot. It is a Linux sysadmin toolkit with specialized workflows for logs, commands, configurations, scripts, troubleshooting and security checks.
+Most AI tools for Linux administration still behave like generic chatbots.
 
-| Generic AI chat | SysAI |
-|---|---|
-| Open a browser and write a long prompt | Open the desktop app and choose the right tool |
-| Explain your environment every time | Save a system profile once |
-| Read a long answer and extract the command | Get structured output ready to copy |
-| Manually ask for risks and rollback | Commands are prompted to include warnings, verification and rollback notes |
-| Use a single provider | Bring your own Gemini, OpenAI, Claude, DeepSeek, Mistral or Ollama |
+SysAI tries to solve a different problem.
 
-**BYOK — Bring Your Own Key.** SysAI does not use a SysAI cloud account and does not send your data to a SysAI server. AI requests go directly from your machine to the provider you configure. With Ollama, requests can run fully locally.
+Instead of focusing on conversational interactions, SysAI is designed around operational workflows:
 
----
+* log analysis
+* troubleshooting
+* security auditing
+* script generation
+* configuration generation
+* infrastructure diagnostics
+* verification and rollback workflows
 
-## ⚡ Features
-
-### 🔓 Free tools
-
-**📋 Log Analyzer**  
-Paste logs from syslog, journalctl, nginx, Docker, LND, Bitcoin Core or any service. SysAI identifies likely root causes, severity and suggested fixes.
-
-**⌨️ Command Crafter**  
-Describe what you need in plain language and get an exact Linux command with explanation, warnings, sudo/destructive flags, verification and rollback notes when applicable.
-
-**🔍 Explain Mode**  
-Paste a command or script and get a line-by-line explanation with risk notes and possible improvements.
-
-### 🔐 Pro tools
-
-**⚙️ Config Generator**  
-Generate production-oriented configs for nginx, Apache, iptables, Docker Compose, systemd, SSH, fail2ban and more.
-
-**🔧 Troubleshooter**  
-Describe a problem and get a guided diagnostic path with concrete commands and next steps.
-
-**📜 Script Builder**  
-Generate bash or Python scripts with logging, validation, error handling and usage notes.
-
-**🛡️ Security Auditor**  
-Audit configs or system descriptions and receive findings with severity, remediation steps and notes. Includes built-in scanners:
-
-- **Port Scanner** — native Node.js implementation, no nmap required
-- **TLS/SSL Checker** — native Node.js implementation, no sslscan required
-- **SSH Audit** — bundled ssh-audit binary/script support where available
-
-### 🌐 AI providers
-
-| Provider | API key | Notes |
-|---|---:|---|
-| Google Gemini | Yes | Good default for free/low-cost testing |
-| OpenAI | Yes | Good general-purpose models |
-| Anthropic Claude | Yes | Strong for complex reasoning and scripts |
-| DeepSeek | Yes | Budget-friendly option |
-| Mistral AI | Yes | European provider |
-| Ollama | No | Local/offline models on your machine |
-
-### 🌍 Languages
-
-UI and AI response language support: English, Italiano, Français, Deutsch, Español.
-
-### 🎨 Themes
-
-Dark and light mode.
+The goal is making AI outputs feel operationally useful instead of conversational.
 
 ---
 
-## 🔒 Privacy model
+# 🧠 What makes SysAI different?
 
-SysAI is local-first, not cloud-hosted.
+## Generic AI chat vs SysAI
 
-- No SysAI account is required.
-- No telemetry is intentionally collected by SysAI.
-- No request is sent to a SysAI backend.
-- API keys are stored locally.
-- In Electron builds, API keys are stored through Electron `safeStorage` in the app user data directory.
-- In browser/dev fallback mode only, API keys may fall back to browser `localStorage`.
-- AI prompts and data are sent to the AI provider you configure, unless you use a local Ollama model.
-
-Important: third-party AI providers have their own privacy and data-retention policies. SysAI avoids being a middleman, but it cannot control the provider selected by the user.
-
----
-
-## 📦 Installation
-
-**Requirements:** 64-bit Linux and at least one AI provider, unless you use Ollama locally.
-
-### RPM — Fedora, RHEL, Rocky Linux, CentOS, AlmaLinux
-
-```bash
-sudo dnf install ./sysai-assistant_1.1.0-beta_x86_64.rpm
-```
-
-### DEB — Ubuntu, Debian, Pop!_OS, Linux Mint
-
-```bash
-sudo apt install ./sysai-assistant_1.1.0-beta_amd64.deb
-```
-
-If your distro reports missing dependencies, install them first, then retry the package install.
-
-### AppImage — most Linux distributions
-
-```bash
-chmod +x sysai-assistant_1.1.0-beta_x86_64.AppImage
-./sysai-assistant_1.1.0-beta_x86_64.AppImage
-```
-
-### First launch
-
-1. Open SysAI from your application menu.
-2. Go to **Settings → AI Providers**.
-3. Add at least one API key, or install/start Ollama.
-4. Select your default provider/model.
-5. Add a short system profile, for example: `Ubuntu 24.04 VPS, Docker, nginx, Bitcoin Core, LND`.
+| Generic AI chat           | SysAI                                       |
+| ------------------------- | ------------------------------------------- |
+| Long prompts every time   | Specialized operational tools               |
+| Generic AI responses      | Environment-aware diagnostics               |
+| Huge text blobs           | Structured operational output               |
+| Manual risk evaluation    | Risk + confidence analysis                  |
+| Manually ask for rollback | Built-in verification and rollback guidance |
+| Browser-based workflow    | Dedicated Linux operations workspace        |
+| Chat-first                | Workflow-first                              |
 
 ---
 
-## 🔑 Get an API key
+# ⚡ Core Concepts
 
-### Google Gemini
+## 🧩 Environment-aware diagnostics
 
-1. Go to Google AI Studio.
-2. Create an API key.
-3. Paste it in **SysAI → Settings → Google Gemini**.
+SysAI detects operational context and adapts troubleshooting accordingly.
 
-### Ollama — local/offline
+Examples:
+
+* Docker / Docker Compose
+* systemd
+* reverse proxies
+* Linux services
+* networking stacks
+* Bitcoin / Lightning infrastructure
+* self-hosted environments
+
+This allows SysAI to generate more realistic operational workflows instead of generic Linux suggestions.
+
+---
+
+## 🛠️ Structured operational output
+
+Instead of returning giant AI-generated paragraphs, SysAI produces:
+
+* structured fix steps
+* verification commands
+* rollback guidance
+* assumptions tracking
+* operational recommendations
+* confidence/risk analysis
+
+The result is cleaner, safer and more production-oriented.
+
+---
+
+## 🔒 Local-first architecture
+
+SysAI does not require a SysAI cloud account.
+
+AI requests go directly from your machine to the provider you configure.
+
+Supported providers:
+
+* Gemini
+* OpenAI
+* Claude
+* DeepSeek
+* Mistral
+* Ollama (fully local/offline)
+
+With Ollama, SysAI can work entirely locally.
+
+---
+
+# ⚡ Features
+
+## 🔓 Free tools
+
+### 📋 Log Analyzer
+
+Analyze logs from:
+
+* syslog
+* journalctl
+* nginx
+* Docker
+* Bitcoin Core
+* LND
+* reverse proxies
+* custom services
+
+Features:
+
+* root-cause analysis
+* structured remediation
+* verification workflows
+* rollback guidance
+* confidence/risk scoring
+
+---
+
+### ⌨️ Command Crafter
+
+Generate Linux commands from natural language requests with:
+
+* explanation
+* sudo/destructive warnings
+* rollback notes
+* verification commands
+* operational context awareness
+
+---
+
+### 🔍 Explain Mode
+
+Explain commands and scripts line-by-line with:
+
+* risk analysis
+* operational implications
+* safer alternatives
+* verification recommendations
+
+---
+
+## 🔐 Pro tools
+
+### ⚙️ Config Generator
+
+Generate production-oriented configs for:
+
+* nginx
+* Apache
+* Docker Compose
+* systemd
+* SSH
+* fail2ban
+* iptables
+* reverse proxies
+
+Includes:
+
+* validation commands
+* security notes
+* rollback guidance
+
+---
+
+### 🔧 Troubleshooter
+
+Guided infrastructure diagnostics with:
+
+* operational workflows
+* environment-aware reasoning
+* Docker/systemd detection
+* structured remediation
+* rollback procedures
+* verification paths
+
+---
+
+### 📜 Script Builder
+
+Generate Bash or Python scripts with:
+
+* logging
+* validation
+* error handling
+* rollback recommendations
+* operational safeguards
+
+---
+
+### 🛡️ Security Auditor
+
+Audit configurations and infrastructure descriptions with:
+
+* severity classification
+* remediation guidance
+* operational recommendations
+* verification steps
+
+Includes built-in scanners:
+
+* Port Scanner
+* TLS/SSL Checker
+* SSH Audit
+
+---
+
+# 🎨 UI & Workspace
+
+SysAI features a modern infrastructure-oriented workspace inspired by:
+
+* Warp
+* Linear
+* Tailscale
+* modern DevOps tooling
+
+Recent UI improvements include:
+
+* premium multi-column layout
+* operational status widgets
+* integrated update indicators
+* improved hierarchy and spacing
+* refined command/result rendering
+* infrastructure-oriented visual design
+
+---
+
+# 🌐 Languages
+
+Supported UI and response languages:
+
+* English
+* Italiano
+* Français
+* Deutsch
+* Español
+
+---
+
+# 🔒 Privacy model
+
+SysAI is local-first.
+
+* No SysAI account required
+* No telemetry intentionally collected
+* No SysAI cloud backend
+* API keys stored locally
+* Electron safeStorage support
+* Ollama fully local support
+
+Important:
+third-party AI providers have their own privacy policies and retention systems.
+
+SysAI avoids acting as a middleman, but cannot control external provider behavior.
+
+---
+
+# 📦 Installation
+
+## Linux packages available
+
+* AppImage
+* DEB
+* RPM
+
+### RPM
 
 ```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.2
-ollama serve
+sudo dnf install ./sysai-assistant_1.3.0-beta_x86_64.rpm
 ```
 
-SysAI expects Ollama at:
+### DEB
+
+```bash
+sudo apt install ./sysai-assistant_1.3.0-beta_amd64.deb
+```
+
+### AppImage
+
+```bash
+chmod +x sysai-assistant_1.3.0-beta_x86_64.AppImage
+./sysai-assistant_1.3.0-beta_x86_64.AppImage
+```
+
+---
+
+# 🚀 First launch
+
+1. Open SysAI
+2. Configure at least one AI provider
+3. Select your default model
+4. Optionally add a system profile
+5. Start using the operational tools
+
+Example system profile:
 
 ```text
-http://localhost:11434
+Ubuntu 24.04 VPS, Docker, nginx, Bitcoin Core, LND
 ```
 
-### Other providers
+---
 
-Create a key from the official console of OpenAI, Anthropic, DeepSeek or Mistral and paste it in Settings.
+# 🔑 AI providers
+
+| Provider | Local | Notes                         |
+| -------- | ----- | ----------------------------- |
+| Gemini   | No    | Good free/low-cost option     |
+| OpenAI   | No    | Strong general-purpose models |
+| Claude   | No    | Excellent reasoning           |
+| DeepSeek | No    | Budget-friendly               |
+| Mistral  | No    | European provider             |
+| Ollama   | Yes   | Fully local/offline           |
 
 ---
 
-## 🧪 Beta program
+# 🔄 Update system
 
-SysAI is currently in beta. Feedback is especially useful on:
+SysAI includes an integrated GitHub release checker with:
 
-- installation on different Linux distributions;
-- quality of generated commands/configs/scripts;
-- scanner behavior;
-- API provider/model behavior;
-- UI/UX issues;
-- features worth paying for.
-
-Contact:
-
-- Email: `shadowbip@proton.me`
-- Nostr: `npub1yag9ggwzdrekxput74qq66p88wv8r68r2f3lm3znycqqyh408ufs7htp3e`
-- GitHub Issues: use the repository issue tracker.
+* silent background checks
+* update availability detection
+* integrated version status
+* release link support
+* offline-safe behavior
 
 ---
 
-## 🏗️ Architecture
+# ⚠️ Current limitations
+
+SysAI is still beta software.
+
+Important notes:
+
+* Always verify generated commands before execution
+* AI models can hallucinate
+* SysAI does not automatically execute commands
+* Generated scripts/configurations should be reviewed before production use
+* Different AI providers produce different quality levels
+
+Operational awareness improves outputs significantly, but does not replace real system administration knowledge.
+
+---
+
+# 👥 Who is SysAI for?
+
+SysAI is especially useful for:
+
+* Linux sysadmins
+* self-hosted users
+* homelab operators
+* DevOps engineers
+* VPS users
+* Docker users
+* Bitcoin/Lightning node operators
+* infrastructure hobbyists
+
+---
+
+# 🏗️ Architecture
 
 ```text
 ┌──────────────────────────────────────────┐
@@ -195,35 +392,23 @@ Contact:
 │  │            │    │                  │  │
 │  │  Tools     │    │  IPC whitelist   │  │
 │  │  Settings  │    │  safeStorage     │  │
-│  │  i18n      │    │  port scanner    │  │
-│  │  License   │    │  TLS checker     │  │
-│  └─────┬──────┘    │  ssh-audit       │  │
-│        │           └──────────────────┘  │
+│  │  i18n      │    │  scanners        │  │
+│  │  License   │    │  update checker  │  │
+│  └─────┬──────┘    └──────────────────┘  │
 │        │                                 │
 │  ┌─────▼──────┐                          │
-│  │ server.js  │  Local Express proxy     │
-│  │ 127.0.0.1  │  Provider API calls      │
+│  │ server.js  │  Local provider proxy    │
+│  │ 127.0.0.1  │  AI API communication    │
 │  └─────┬──────┘                          │
 └────────┼─────────────────────────────────┘
          │ HTTPS / local HTTP
          ▼
-   AI provider selected by the user
-   Gemini / OpenAI / Claude / DeepSeek / Mistral / Ollama
+   User-selected AI provider
 ```
-
-Security choices:
-
-- Electron `contextIsolation: true` and `sandbox: true`
-- IPC channel whitelist
-- no arbitrary shell command execution from the renderer
-- `ssh-audit` executed through `execFile`, not shell string interpolation
-- API keys encrypted locally with Electron `safeStorage` where available
-- scan targets sanitized before execution
-- license verification with Ed25519 signatures
 
 ---
 
-## 🛠️ Build from source
+# 🛠️ Build from source
 
 ```bash
 git clone https://github.com/shadowbipnode/sysai-assistant.git
@@ -238,54 +423,51 @@ Build packages:
 npm run electron:build:all
 ```
 
-Output is generated in `release/`.
+---
 
-### Clean project archive
+# 🗺️ Roadmap
 
-Do not include local dependencies, build artifacts, git metadata or private licensing tools in a shared archive:
+## Completed
 
-```bash
-zip -r sysai-assistant-clean.zip . \
-  -x "node_modules/*" \
-     ".git/*" \
-     "dist/*" \
-     "release/*" \
-     "tools/*" \
-     "src/src.zip"
-```
+* [x] 7 operational AI tools
+* [x] environment-aware diagnostics
+* [x] structured operational output
+* [x] rollback + verification workflows
+* [x] risk/confidence analysis
+* [x] multiple AI providers
+* [x] integrated update checker
+* [x] premium infrastructure UI
+* [x] multilingual support
+* [x] local-first architecture
+
+## Planned
+
+* [ ] export to `.sh`, `.conf`, `.md`
+* [ ] command palette
+* [ ] terminal-oriented workspace mode
+* [ ] onboarding flows
+* [ ] smarter operational context inference
+* [ ] dedicated Bitcoin/Lightning operational profiles
+* [ ] infrastructure reporting/export system
+* [ ] favorites/snippet library
 
 ---
 
-## 🗺️ Roadmap
+# 🤝 Contributing
 
-- [x] 7 sysadmin AI tools
-- [x] multiple AI providers with BYOK
-- [x] multilingual UI and responses
-- [x] built-in port/TLS/SSH scanners
-- [x] dark/light theme
-- [x] license verification
-- [x] command history
-- [x] safer command-prompt schema with verification/rollback fields
-- [x] encrypted local API-key storage in Electron builds
-- [ ] export to `.sh`, `.conf`, `.md`
-- [ ] favorites/snippet library
-- [ ] keyboard shortcuts
-- [ ] auto-update
-- [ ] dedicated Bitcoin/Lightning node operator profile
-- [ ] Bitcoin Core/LND/Tor/nginx log analyzers
+Feedback, testing and contributions are welcome.
+
+This project is evolving quickly and real-world Linux/sysadmin feedback is extremely valuable.
 
 ---
 
-## 🤝 Contributing
+# 📄 License
 
-Contributions are welcome. Fork the repository, create a branch and open a pull request. For bugs or feature requests, open a GitHub Issue.
-
----
-
-## 📄 License
-
-[MIT](LICENSE)
+MIT
 
 ---
 
-<p align="center">Built with ⚡ by a sysadmin, for sysadmins.</p>
+<p align="center">
+Built with ⚡ by a sysadmin, for sysadmins.
+</p>
+
