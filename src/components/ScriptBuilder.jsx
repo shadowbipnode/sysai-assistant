@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ProfessionalResult from "./ProfessionalResult";
 
 const ScriptBuilder = ({ t, onGenerate, onBack }) => {
   const [scriptType, setScriptType] = useState(0);
@@ -86,6 +87,7 @@ const ScriptBuilder = ({ t, onGenerate, onBack }) => {
               maxHeight: 400, overflowY: "auto",
             }}>{result.script}</pre>
           </div>
+          <ProfessionalResult result={result} compact />
         </div>
       )}
     </div>

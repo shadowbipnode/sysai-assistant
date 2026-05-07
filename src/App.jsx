@@ -345,9 +345,7 @@ function App() {
         try {
           const parsed = JSON.parse(response.substring(start, end + 1));
           if (parsed.script) {
-            result.script = parsed.script;
-            result.filename = parsed.filename || result.filename;
-            result.usage = parsed.usage || result.usage;
+            result = { ...result, ...parsed };
             showToast("Script generato!", "success");
             history.addEntry({
               tool: 'scriptBuilder',

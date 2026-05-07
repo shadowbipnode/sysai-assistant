@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ProfessionalResult from "./ProfessionalResult";
 
 const ExplainMode = ({ t, onExplain, onBack }) => {
   const [command, setCommand] = useState("");
@@ -91,6 +92,7 @@ const ExplainMode = ({ t, onExplain, onBack }) => {
               )}
             </div>
           </div>
+          <ProfessionalResult result={result} compact />
         </div>
       )}
     </div>

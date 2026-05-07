@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ProfessionalResult from "./ProfessionalResult";
 
 const CommandCrafter = ({ t, onCraft, onBack }) => {
   const [cmdText, setCmdText] = useState("");
@@ -73,6 +74,7 @@ const CommandCrafter = ({ t, onCraft, onBack }) => {
               <p style={{ fontSize: 14, color: "#8B95A8", whiteSpace: "pre-wrap" }}>{result.explanation}</p>
             </div>
           )}
+          <ProfessionalResult result={result} compact />
         </div>
       )}
     </div>

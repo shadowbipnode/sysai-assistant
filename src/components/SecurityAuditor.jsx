@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ProfessionalResult from "./ProfessionalResult";
 import { portScan, tlsCheck, sshAudit } from "../utils/scanners";
 
 const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
@@ -241,37 +242,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
       {result && (
         <div style={{ marginTop: 24, animation: "slideInRight 0.3s ease" }}>
-          <div style={{
-            background: "#131720", border: "1px solid #00D4AA33", borderRadius: 12,
-            overflow: "hidden",
-          }}>
-            <div style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "10px 16px", background: "#00D4AA22",
-            }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#00D4AA" }}>
-                {mode === 0 ? "🛡️ AUDIT REPORT" : "📡 SCAN REPORT"}
-              </span>
-              <button onClick={() => navigator.clipboard.writeText(result.report)} style={{
-                background: "none", border: "1px solid #00D4AA44", borderRadius: 6,
-                color: "#00D4AA", padding: "4px 12px", fontSize: 11, cursor: "pointer",
-              }}>📋 Copy</button>
-            </div>
-            <pre style={{
-              padding: 20, fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
-              color: "#E8ECF4", whiteSpace: "pre-wrap", overflowX: "auto",
-              maxHeight: 500, overflowY: "auto",
-            }}>{result.report}</pre>
-          </div>
-          {result.recommendations && (
-            <div style={{
-              background: "#131720", border: "1px solid #FF4D6A33", borderRadius: 12,
-              padding: 16, marginTop: 12,
-            }}>
-              <h4 style={{ fontSize: 13, fontWeight: 600, color: "#FF4D6A", marginBottom: 8 }}>⚠️ RECOMMENDATIONS</h4>
-              <p style={{ fontSize: 13, color: "#8B95A8", lineHeight: 1.5 }}>{result.recommendations}</p>
-            </div>
-          )}
+          <ProfessionalResult result={result} />
         </div>
       )}
     </div>

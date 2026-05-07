@@ -109,6 +109,84 @@ export async function fetchModels(providerId, apiKey, baseURL) {
   }
 }
 
+
+function detectEnvironmentSignals(inputText, selectedContext = '') {
+  const text = `${selectedContext}\n${inputText || ''}`;
+  const lower = text.toLowerCase();
+  const env = [];
+  const add = (name, reason) => {
+    if (!env.some(e => e.name === name)) env.push({ name, reason });
+  };
+
+  if (/docker|compose|container|dockerd|docker ps|docker logs|172\.1[6-9]\.|172\.2\d\.|172\.3[0-1]\./i.test(text)) add('Docker/Compose', 'container, compose, Docker daemon, or Docker network patterns detected');
+  if (/kubernetes|kubectl|k8s|pod\b|namespace\b|deployment\b/i.test(text)) add('Kubernetes', 'Kubernetes resource or kubectl patterns detected');
+  if (/systemctl|journalctl|\.service|systemd|failed to start|unit .* failed/i.test(text)) add('systemd', 'systemd/journal service patterns detected');
+  if (/nginx|upstream|proxy_pass|connect\(\) failed|no live upstreams/i.test(text)) add('nginx/reverse-proxy', 'nginx reverse proxy or upstream patterns detected');
+  if (/apache|httpd|mod_ssl/i.test(text)) add('apache/httpd', 'Apache/httpd patterns detected');
+  if (/tor|onion|socks|controlport|hiddenservice/i.test(text)) add('Tor', 'Tor/onion networking patterns detected');
+  if (/lnd|lncli|macaroon|channel|htlc|lightning/i.test(text)) add('LND/Lightning', 'Lightning node patterns detected');
+  if (/bitcoind|bitcoin core|debug\.log|zmq|mempool|rpcuser|rpcpassword|prune=/i.test(text)) add('Bitcoin Core', 'Bitcoin Core node patterns detected');
+  if (/postgres|psql|postgresql/i.test(text)) add('PostgreSQL', 'PostgreSQL patterns detected');
+  if (/mysql|mariadb|mysqld/i.test(text)) add('MySQL/MariaDB', 'MySQL/MariaDB patterns detected');
+  if (/ssh|sshd|authorized_keys|permission denied \(publickey\)/i.test(text)) add('SSH', 'SSH/sshd patterns detected');
+  if (/ufw|firewalld|iptables|nftables/i.test(text)) add('Firewall', 'firewall tooling patterns detected');
+
+  return {
+    names: env.map(e => e.name),
+    text: env.map(e => `- ${e.name}: ${e.reason}`).join('\n') || '- No strong environment signature detected.',
+  };
+}
+
+function getProfessionalOutputContract(toolName) {
+  return `
+PROFESSIONAL OUTPUT RULES FOR ${toolName}:
+- Return ONLY valid JSON. No markdown outside JSON. No text before or after.
+- Be operational, not conversational.
+- Always include a risk/severity level calibrated by remediation risk, not business impact.
+- Always include confidence: LOW, MEDIUM, or HIGH.
+- Always include next_best_action: the single safest first action.
+- Always separate evidence from assumptions.
+- Always include verification commands when commands or changes are suggested.
+- Always include rollback guidance. If no rollback is needed, say exactly: "No rollback needed for read-only checks."
+- Prefer read-only discovery commands before restart/change commands.
+- Do not invent service names, container names, paths, users, domains, package names, or config filenames not present in the input.
+- If a name is unknown, give discovery commands first and explain how to replace placeholders.
+- Do not present placeholder commands as copy-paste-ready final actions. Put placeholder commands only after a discovery step, with a clear comment.
+- For permission/ownership fixes, record current ownership and permissions before suggesting chmod/chown. Avoid recursive chown unless absolutely necessary.
+- If Docker bind-mount permission errors are involved, consider UID/GID mismatch, read-only mounts, SELinux labels, AppArmor, and host path permissions.
+
+RISK CALIBRATION:
+- LOW: read-only checks, explanation, status/log/list commands, curl/ss/grep/tail, configuration review with no changes.
+- MEDIUM: service reload/restart, container restart, temporary runtime changes.
+- HIGH: editing configuration, firewall changes, permissions/ownership changes, package install/upgrade/remove, persistent system changes.
+- CRITICAL: destructive deletion, formatting, key/wallet reset, database migration without backup, force-closing Lightning channels, disabling security controls.
+
+CONFIDENCE CALIBRATION:
+- HIGH: direct evidence in input supports the conclusion.
+- MEDIUM: likely cause is visible but an internal dependency/name is missing.
+- LOW: incomplete, mixed, ambiguous, or insufficient input.
+`;
+}
+
+function getEnvironmentContext(inputText, selectedContext = '') {
+  const env = detectEnvironmentSignals(inputText, selectedContext);
+  return `
+ENVIRONMENT-AWARE CONTEXT:
+Detected environments/stacks: ${env.names.length ? env.names.join(', ') : 'unknown'}
+Detection reasons:
+${env.text}
+
+ENVIRONMENT-SPECIFIC GUIDANCE:
+- If Docker/Compose is detected, prefer docker ps, docker logs, docker inspect, docker compose ps/logs before systemctl assumptions.
+- For Docker bind mounts with permission denied, first inspect ls -ln/stat/id/docker inspect output before chmod/chown. On SELinux systems, include getenforce and ls -Z as optional checks.
+- If systemd is detected, prefer systemctl status, journalctl -u, systemctl is-active, and unit-specific checks.
+- If nginx/reverse-proxy is detected, distinguish proxy failure from backend application failure and verify both upstream and nginx config.
+- If Bitcoin Core is detected, consider IBD/sync, RPC auth, pruning, ZMQ, disk, Tor-only networking, and debug.log signals.
+- If LND/Lightning is detected, consider wallet unlock, bitcoind RPC, chain sync, peers, channel state, macaroon/TLS, Tor, and liquidity/routing state.
+- If Tor is detected, consider socks/control port, hidden service config, onion reachability, and DNS leaks.
+`;
+}
+
 // ============================================================
 // SYSTEM PROMPT BASE (usato da tutti i tool)
 // ============================================================
@@ -213,6 +291,7 @@ DIAGNOSTIC REQUIREMENTS:
 - Prefer read-only diagnostic commands before restart/change commands.
 - Never suggest destructive commands unless absolutely necessary and clearly marked.
 - Do not present placeholder commands as final fixes. If a service/container name is unknown, first provide commands to discover it.
+- Prefer commands that discover names automatically, e.g. ss/lsof/docker ps/docker inspect/systemctl list-units, before commands containing <service_name> or <container_name>.
 
 RISK CALIBRATION RULES:
 - severity means REMEDIATION RISK, not business impact.
@@ -257,115 +336,230 @@ Use this exact JSON schema:
 
 export function buildCommandPrompt(description, systemProfile, lang) {
   const systemContext = getSystemContext(systemProfile, lang);
+  const environmentContext = getEnvironmentContext(description, 'command generation');
 
   return `${systemContext}
+${environmentContext}
+${getProfessionalOutputContract('Command Crafter')}
 
-TASK: Generate the exact Linux command for this request.
+TASK: Generate the exact Linux command or command sequence for this request.
 
-REQUEST: ${description}
+REQUEST:
+${description}
 
-Respond STRICTLY with this JSON format (no other text before or after):
+COMMAND REQUIREMENTS:
+- Prefer the safest command that accomplishes the goal.
+- If the task is ambiguous, generate discovery/check commands first instead of a dangerous final command.
+- Include comments inside multi-line command blocks when helpful.
+- If sudo is required, explain why.
+- If the command changes state, include verification and rollback.
+
+Respond STRICTLY with this JSON format:
 {
-  "command": "the exact command to run",
-  "explanation": "What each part of the command does, flag by flag",
-  "warning": "Any risks or side effects (null if safe)",
+  "command": "the exact command or command block to run",
+  "explanation": "What the command does and why these flags/options are used",
+  "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+  "confidence": "LOW|MEDIUM|HIGH",
   "requires_sudo": true,
   "destructive": false,
-  "verification": "command to verify the result",
-  "rollback": "rollback command or null if not applicable",
-  "alternatives": "Alternative approaches if any (null if none)"
+  "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy"],
+  "next_best_action": "the first safest action to take",
+  "evidence": ["facts from the request that influenced the command"],
+  "assumptions": ["assumptions made because details were missing"],
+  "verification": "command(s) to verify the result",
+  "rollback": "rollback command(s) or 'No rollback needed for read-only checks.'",
+  "warning": "risks or side effects, or null",
+  "alternatives": "alternative approach if useful, or null"
 }`;
 }
 
+
 export function buildExplainPrompt(commandOrScript, systemProfile, lang) {
-  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
-  const targetLang = languageMap[lang] || "english";
+  const environmentContext = getEnvironmentContext(commandOrScript, 'explain mode');
 
   return `${getSystemContext(systemProfile, lang)}
+${environmentContext}
+${getProfessionalOutputContract('Explain Mode')}
 
-TASK: Explain this command or script line by line. You MUST respond with ONLY valid JSON.
+TASK: Explain this command or script line by line and assess operational risk.
 
 INPUT:
 \`\`\`
 ${commandOrScript}
 \`\`\`
 
-Response MUST be in this EXACT JSON format (no markdown, no extra text):
-{"summary": "one sentence summary", "lines": [{"line": "exact line", "explanation": "what it does"}], "risks": "risks or null", "improvements": "improvements or null"}`;
+EXPLANATION REQUIREMENTS:
+- Explain what each line does.
+- Identify whether it reads data, modifies state, restarts services, changes permissions, deletes files, or touches security-sensitive material.
+- Highlight hidden risks such as glob expansion, recursive deletion, permission changes, network exposure, credentials in shell history, or irreversible actions.
+- Suggest safer alternatives when appropriate.
+
+Response MUST be in this EXACT JSON format:
+{
+  "summary": "one sentence summary",
+  "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+  "confidence": "LOW|MEDIUM|HIGH",
+  "requires_sudo": true,
+  "destructive": false,
+  "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy"],
+  "next_best_action": "safe first action before running it, or 'Review the explanation before execution'",
+  "lines": [{"line": "exact line", "explanation": "what it does"}],
+  "risks": "risks or null",
+  "improvements": "safer improvements or null",
+  "verification": "command(s) to verify the command had the intended effect, or null",
+  "rollback": "rollback command(s) or 'No rollback needed for read-only checks.'",
+  "assumptions": ["assumptions made while interpreting the input"]
+}`;
 }
+
+
 export function buildConfigPrompt(description, configType, systemProfile, lang) {
   const systemContext = getSystemContext(systemProfile, lang);
+  const environmentContext = getEnvironmentContext(description, configType);
 
   return `${systemContext}
+${environmentContext}
+${getProfessionalOutputContract('Config Generator')}
 
 TASK: Generate a production-ready configuration file.
 
 CONFIG TYPE: ${configType}
-REQUIREMENTS: ${description}
+REQUIREMENTS:
+${description}
 
-Respond STRICTLY with this JSON format (no other text before or after):
+CONFIG REQUIREMENTS:
+- Prefer secure defaults.
+- Include only settings relevant to the stated requirements.
+- Do not invent domains, IPs, usernames, secrets, paths, or service names unless clearly marked as placeholders.
+- Include validation commands.
+- Include deployment notes and rollback steps.
+- For Docker/Compose, include healthchecks when appropriate.
+- For nginx/reverse proxy, include config validation and backend reachability checks.
+- For Bitcoin/LND/Tor configs, avoid exposing RPC/admin interfaces publicly and warn about secrets.
+
+Respond STRICTLY with this JSON format:
 {
-  "filename": "suggested filename (e.g., nginx.conf, docker-compose.yml)",
+  "filename": "suggested filename",
   "config": "the complete configuration file content",
-  "explanation": "Brief explanation of key settings and why they were chosen",
-  "security_notes": "Security considerations for this config"
+  "explanation": "brief explanation of key settings and why they were chosen",
+  "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+  "confidence": "LOW|MEDIUM|HIGH",
+  "requires_sudo": true,
+  "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
+  "next_best_action": "first safe action before deployment",
+  "verification": "commands to validate/test the config",
+  "rollback": "commands or steps to restore the previous config",
+  "security_notes": "security considerations for this config",
+  "assumptions": ["assumptions made because details were missing"],
+  "additional_logs_optional": true,
+  "additional_logs_needed": ["optional info that would improve the config"]
 }`;
 }
 
+
 export function buildTroubleshootPrompt(problem, previousSteps, systemProfile, lang) {
   const systemContext = getSystemContext(systemProfile, lang);
+  const environmentContext = getEnvironmentContext(problem, 'troubleshooting');
   const prevContext = previousSteps?.length
     ? `\nPREVIOUS DIAGNOSTIC STEPS:\n${previousSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
     : '';
 
   return `${systemContext}
+${environmentContext}
+${getProfessionalOutputContract('Troubleshooter')}
 
-TASK: Guide troubleshooting for this problem.
+TASK: Guide troubleshooting for this problem as an incident-response runbook.
 ${prevContext}
-PROBLEM: ${problem}
 
-Respond STRICTLY with this JSON format (no other text before or after):
+PROBLEM:
+${problem}
+
+TROUBLESHOOTING REQUIREMENTS:
+- Start with the safest read-only check.
+- Separate likely causes from assumptions.
+- If the environment appears Docker/Compose, include Docker checks before systemd restarts.
+- If the environment appears systemd, include systemctl/journalctl checks.
+- If Bitcoin/LND/Tor is involved, use domain-specific checks and avoid dangerous wallet/channel operations.
+- Provide a clear stop condition: how the user knows the issue is fixed.
+- For Docker permission problems, prioritize: ls -ln/stat -> docker inspect user/mounts -> id/UID mapping -> optional SELinux/AppArmor checks -> only then ownership/permission changes.
+- For rollback after ownership/permission changes, instruct the user to capture original ownership/permissions first. Do not claim a reliable rollback exists if original state was not recorded.
+
+Respond STRICTLY with this JSON format:
 {
-  "diagnosis": "Most likely cause based on the description",
-  "check_command": "Command to run to verify the diagnosis",
-  "expected_output": "What the output should look like if this is the cause",
-  "fix": "Commands to fix the issue",
-  "follow_up_question": "Question to ask if the diagnosis is wrong (null if confident)"
+  "diagnosis": "most likely cause based on the description",
+  "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+  "confidence": "LOW|MEDIUM|HIGH",
+  "requires_sudo": true,
+  "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
+  "next_best_action": "the single safest first command/action",
+  "root_cause": "likely root cause and why",
+  "evidence": ["specific facts from the problem"],
+  "assumptions": ["assumptions made because details are missing"],
+  "check_command": "first command to verify the diagnosis",
+  "expected_output": "what the output should look like if this diagnosis is correct",
+  "fix": "step-by-step commands to fix the issue, starting with read-only checks. Do not use placeholders until after discovery commands.",
+  "verification": "commands to confirm the issue is fixed, including service/container logs when relevant",
+  "rollback": "rollback guidance. For ownership/permission changes, include a pre-change backup command such as stat/ls -ln first, or state that reliable rollback requires the recorded original UID/GID/mode.",
+  "prevention": "1-3 practical prevention steps",
+  "follow_up_question": "question to ask if the diagnosis is wrong, or null",
+  "additional_logs_optional": true,
+  "additional_logs_needed": ["optional outputs that would improve confidence"]
 }`;
 }
 
+
 export function buildScriptPrompt(description, scriptType, systemProfile, lang) {
   const systemContext = getSystemContext(systemProfile, lang);
+  const environmentContext = getEnvironmentContext(description, scriptType || 'bash');
 
   return `${systemContext}
+${environmentContext}
+${getProfessionalOutputContract('Script Builder')}
 
 TASK: Generate a complete, production-ready script.
 
 SCRIPT TYPE: ${scriptType || 'bash'}
-REQUIREMENTS: ${description}
+REQUIREMENTS:
+${description}
 
 The script MUST include:
 - Shebang line
-- Error handling (set -euo pipefail for bash)
+- Strict mode where appropriate, e.g. set -euo pipefail for bash
 - Input validation
 - Logging
 - Helpful comments
 - Usage information
+- A dry-run mode when the script changes system state
+- Clear safety checks before destructive or privileged operations
 
-Respond STRICTLY with this JSON format (no other text before or after):
+Respond STRICTLY with this JSON format:
 {
   "filename": "suggested filename",
   "script": "the complete script content",
-  "usage": "How to use this script",
-  "dependencies": "Required packages or tools (null if none)"
+  "usage": "how to use this script",
+  "dependencies": "required packages or tools, or null",
+  "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+  "confidence": "LOW|MEDIUM|HIGH",
+  "requires_sudo": true,
+  "destructive": false,
+  "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
+  "next_best_action": "first safe step before running the script",
+  "verification": "commands to verify script result",
+  "rollback": "rollback commands or 'No rollback needed for read-only checks.'",
+  "safety_notes": "important safety notes",
+  "assumptions": ["assumptions made because details were missing"]
 }`;
 }
 
+
 export function buildSecurityAuditPrompt(configOrDescription, auditType, scanResults, systemProfile, lang) {
   const systemContext = getSystemContext(systemProfile, lang);
+  const environmentContext = getEnvironmentContext(`${auditType}\n${configOrDescription}\n${scanResults || ''}`, 'security audit');
   const scanContext = scanResults ? `\nSCAN RESULTS:\n\`\`\`\n${scanResults}\n\`\`\`` : '';
 
   return `${systemContext}
+${environmentContext}
+${getProfessionalOutputContract('Security Auditor')}
 
 TASK: Security audit and hardening recommendations.
 
@@ -376,30 +570,78 @@ INPUT:
 ${configOrDescription}
 \`\`\`
 
-Respond STRICTLY with this JSON format (no other text before or after):
+SECURITY REQUIREMENTS:
+- Prioritize exploitable/high-impact issues first.
+- Separate confirmed findings from assumptions.
+- Avoid recommending changes that could lock the user out without rollback.
+- For SSH, warn before changing authentication or firewall rules.
+- For nginx/TLS, include validation and rollback steps.
+- For Docker, include container/network exposure risks.
+- For Bitcoin/LND, protect RPC, macaroon/TLS, wallet, channels, and Tor privacy.
+
+Respond STRICTLY with this JSON format:
 {
   "risk_level": "LOW|MEDIUM|HIGH|CRITICAL",
+  "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+  "confidence": "LOW|MEDIUM|HIGH",
+  "requires_sudo": true,
+  "detected_stack": ["SSH", "nginx/reverse-proxy", "Docker/Compose", "Bitcoin Core", "LND/Lightning", "Tor"],
+  "next_best_action": "the single safest first hardening action or validation command",
+  "report": "concise security report with confirmed issues and impact",
   "findings": [
-    { "issue": "description", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "fix": "command or action" }
+    { "issue": "description", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "evidence": "evidence from input", "fix": "safe command or action" }
   ],
-  "hardening": "Additional hardening commands (one per line)",
-  "compliance_notes": "Relevant CIS/NIST recommendations if applicable"
+  "recommendations": "specific remediation recommendations with commands where appropriate",
+  "hardening": "additional hardening commands, one per line",
+  "verification": "commands to verify the remediation",
+  "rollback": "rollback commands or 'No rollback needed for read-only checks.'",
+  "compliance_notes": "relevant CIS/NIST recommendations if applicable",
+  "assumptions": ["assumptions made because details were missing"]
 }`;
 }
 
-// Prompt per analizzare output di scan (nmap, sslscan, ssh-audit)
+
+
 export const buildSecurityScanAnalysisPrompt = (targetHost, scanType, scanOutput, systemProfile, lang) => {
-  const languageMap = { it: "italiano", fr: "français", de: "deutsch", es: "español", en: "english" };
-  const targetLang = languageMap[lang] || "english";
+  const environmentContext = getEnvironmentContext(scanOutput, scanType);
 
-  return `Sei un esperto di cybersecurity. Analizza il seguente output di scan per ${targetHost} (tipo: ${scanType}) e identifica vulnerabilità, porte aperte pericolose, ciphers deboli, configurazioni obsolete. Rispondi SOLO in ${targetLang}.
+  return `${getSystemContext(systemProfile, lang)}
+${environmentContext}
+${getProfessionalOutputContract('Security Scan Analyzer')}
 
-OUTPUT SCAN:
+TASK: Analyze this remote security scan output for ${targetHost}.
+
+SCAN TYPE: ${scanType}
+SCAN OUTPUT:
+\`\`\`
 ${scanOutput}
+\`\`\`
 
-Rispondi STRETTAMENTE con questo formato JSON:
+SCAN ANALYSIS REQUIREMENTS:
+- Identify confirmed security issues from the scan output.
+- Do not claim vulnerabilities that are not visible in the scan.
+- Distinguish exposure from exploitability.
+- Prioritize internet-exposed management ports, weak TLS/SSH algorithms, obsolete protocols, and dangerous services.
+- Include safe verification and remediation steps.
+- Include rollback for firewall/config changes.
+
+Respond STRICTLY with this JSON format:
 {
-  "report": "Analisi dettagliata delle vulnerabilità trovate, con spiegazione dei rischi",
-  "recommendations": "Raccomandazioni specifiche per risolvere ogni problema, con comandi dove necessario"
+  "risk_level": "LOW|MEDIUM|HIGH|CRITICAL",
+  "severity": "LOW|MEDIUM|HIGH|CRITICAL",
+  "confidence": "LOW|MEDIUM|HIGH",
+  "requires_sudo": true,
+  "detected_stack": ["SSH", "TLS", "nginx/reverse-proxy", "Docker/Compose"],
+  "next_best_action": "the single safest first action",
+  "report": "concise analysis of vulnerabilities or exposure found",
+  "findings": [
+    { "issue": "description", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "evidence": "evidence from scan", "fix": "safe command or action" }
+  ],
+  "recommendations": "specific recommendations with commands where appropriate",
+  "verification": "commands to verify the remediation",
+  "rollback": "rollback commands or 'No rollback needed for read-only checks.'",
+  "assumptions": ["assumptions made because scan output is limited"],
+  "additional_logs_optional": true,
+  "additional_logs_needed": ["optional additional scan/output to improve confidence"]
 }`;
 };

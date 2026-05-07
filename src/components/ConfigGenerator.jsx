@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ProfessionalResult from "./ProfessionalResult";
 
 const ConfigGenerator = ({ t, onGenerate, onBack }) => {
   const [configType, setConfigType] = useState(0);
@@ -100,6 +101,7 @@ Examples:
               <p style={{ fontSize: 13, color: "#8B95A8", lineHeight: 1.5 }}>{result.explanation}</p>
             </div>
           )}
+          <ProfessionalResult result={result} compact />
         </div>
       )}
     </div>

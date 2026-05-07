@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ProfessionalResult from "./ProfessionalResult";
 
 const Troubleshooter = ({ t, onDiagnose, onBack }) => {
   const [problem, setProblem] = useState("");
@@ -39,38 +40,18 @@ const Troubleshooter = ({ t, onDiagnose, onBack }) => {
         />
       </div>
 
-      <button onClick={handleDiagnose} style={{
-        padding: "12px 28px", background: "#00D4AA", color: "#0B0E14",
-        border: "none", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer",
+      <button onClick={handleDiagnose} disabled={analyzing} style={{
+        padding: "12px 28px", background: analyzing ? "#1E2535" : "#00D4AA",
+        color: analyzing ? "#8B95A8" : "#0B0E14", border: "none",
+        borderRadius: 10, fontWeight: 600, fontSize: 14,
+        cursor: analyzing ? "not-allowed" : "pointer",
       }}>
         {analyzing ? t.troubleshootPage.diagnosing : t.troubleshootPage.start}
       </button>
 
       {result && (
         <div style={{ marginTop: 24, animation: "slideInRight 0.3s ease" }}>
-          <div style={{
-            background: "#131720", border: "1px solid #00D4AA33", borderRadius: 12,
-            padding: 20,
-          }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 12, color: "#00D4AA" }}>
-              🎯 {t.troubleshootPage.solution}
-            </h3>
-            <p style={{ fontSize: 14, color: "#E8ECF4", whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
-              {result.diagnosis || result.explanation || "Nessuna diagnosi disponibile"}
-            </p>
-            {result.check_command && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 12, color: "#00D4AA", marginBottom: 4 }}>🔍 Verifica:</div>
-                <code style={{ background: "#0B0E14", padding: 8, borderRadius: 6, display: "block", fontSize: 12 }}>{result.check_command}</code>
-              </div>
-            )}
-            {result.fix && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 12, color: "#00D4AA", marginBottom: 4 }}>🛠️ Fix:</div>
-                <pre style={{ background: "#0B0E14", padding: 12, borderRadius: 6, fontSize: 12, overflowX: "auto" }}>{result.fix}</pre>
-              </div>
-            )}
-          </div>
+          <ProfessionalResult result={result} />
         </div>
       )}
     </div>
