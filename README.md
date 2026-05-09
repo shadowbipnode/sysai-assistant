@@ -270,7 +270,10 @@ SysAI is local-first.
 * No SysAI cloud backend
 * API keys stored locally
 * Electron safeStorage support
+* API keys encrypted locally in packaged Electron builds
+* Browser/dev fallback warning when secure storage is unavailable
 * Ollama fully local support
+* Remote Google Fonts removed for better privacy/local-first behavior
 
 Important:
 third-party AI providers have their own privacy policies and retention systems.
@@ -281,29 +284,37 @@ SysAI avoids acting as a middleman, but cannot control external provider behavio
 
 # 📦 Installation
 
-## Linux packages available
+## Packages available
+
+### Linux
 
 * AppImage
 * DEB
 * RPM
 
+### Windows beta
+
+* Portable/unpacked ZIP build
+
+Windows support is currently beta. Unsigned builds may trigger SmartScreen warnings.
+
 ### RPM
 
 ```bash
-sudo dnf install ./sysai-assistant_1.3.0-beta_x86_64.rpm
+sudo dnf install ./sysai-assistant_1.3.3-beta_x86_64.rpm
 ```
 
 ### DEB
 
 ```bash
-sudo apt install ./sysai-assistant_1.3.0-beta_amd64.deb
+sudo apt install ./sysai-assistant_1.3.3-beta_amd64.deb
 ```
 
 ### AppImage
 
 ```bash
-chmod +x sysai-assistant_1.3.0-beta_x86_64.AppImage
-./sysai-assistant_1.3.0-beta_x86_64.AppImage
+chmod +x sysai-assistant_1.3.3-beta_x86_64.AppImage
+./sysai-assistant_1.3.3-beta_x86_64.AppImage
 ```
 
 ---
@@ -439,9 +450,17 @@ npm run electron:build:all
 * [x] premium infrastructure UI
 * [x] multilingual support
 * [x] local-first architecture
+* [x] Windows beta build
+* [x] Ollama local-provider validation
+* [x] Content Security Policy hardening
+* [x] safe external URL handling
+* [x] scanner IPC-only security model
+* [x] lint workflow
 
 ## Planned
 
+* [ ] Windows installer/signing
+* [ ] macOS build
 * [ ] export to `.sh`, `.conf`, `.md`
 * [ ] command palette
 * [ ] terminal-oriented workspace mode
