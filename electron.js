@@ -8,6 +8,16 @@ const crypto = require('crypto');
 const https = require('https');
 
 let mainWindow;
+
+function isSafeExternalUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 let proxyProcess;
 
 // ============================================================
@@ -69,7 +79,9 @@ function createWindow() {
 
   // Link esterni si aprono nel browser di sistema
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (isSafeExternalUrl(url)) {
+      shell.openExternal(url);
+    }
     return { action: 'deny' };
   });
 
@@ -568,7 +580,7 @@ ipcMain.handle('check-for-updates', async () => {
 
 // Apri link esterno
 ipcMain.handle('open-external', async (event, url) => {
-  if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
+  if (typeof url === 'string' && isSafeExternalUrl(url)) {
     await shell.openExternal(url);
     return { success: true };
   }

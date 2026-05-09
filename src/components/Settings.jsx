@@ -99,6 +99,22 @@ const Settings = ({ t, lang, theme, accent, accentDim, surface, surface2, border
         <h3 style={{ fontSize: 14, fontWeight: 600, color: text2, marginBottom: 16 }}>
           🤖 {t.settingsPage.apiProviders}
         </h3>
+        {!window.electron?.secureStore && (
+          <div style={{
+            background: "#f59e0b18",
+            border: "1px solid #f59e0b55",
+            color: "#fbbf24",
+            borderRadius: 12,
+            padding: "10px 12px",
+            fontSize: 12,
+            lineHeight: 1.5,
+            marginBottom: 12,
+          }}>
+            ⚠️ Browser/dev mode detected: API keys may be stored in localStorage and are not encrypted.
+            Use the packaged Electron app for encrypted local storage.
+          </div>
+        )}
+
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {AI_PROVIDERS.map((provider) => {
             const isOllama = provider.id === "ollama";

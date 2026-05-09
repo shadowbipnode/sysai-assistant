@@ -1,8 +1,9 @@
 /**
  * SysAI - Scanner Client Utilities
  * 
- * Gestisce le chiamate scan sia via IPC (Electron) che via proxy HTTP.
- * L'app tenta prima IPC, poi fallback al proxy.
+ * Gestisce le chiamate scan via IPC Electron.
+ * Gli scanner sono disponibili solo nell'app Electron packaged/dev,
+ * non nel browser puro, per ridurre la superficie HTTP locale.
  */
 
 // ============================================================
@@ -27,13 +28,7 @@ export async function portScan(target, options = {}) {
     });
   }
 
-  // Fallback: proxy HTTP (per dev mode)
-  const res = await fetch('http://127.0.0.1:3001/api/port-scan', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host: target, ports, timeout }),
-  });
-  return res.json();
+  throw new Error('Port scan is only available in the Electron app.');
 }
 
 // ============================================================
@@ -48,12 +43,7 @@ export async function tlsCheck(target, port = 443) {
     });
   }
 
-  const res = await fetch('http://127.0.0.1:3001/api/tls-check', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host: target, port }),
-  });
-  return res.json();
+  throw new Error('TLS check is only available in the Electron app.');
 }
 
 // ============================================================
@@ -68,12 +58,7 @@ export async function sshAudit(target, port = 22) {
     });
   }
 
-  const res = await fetch('http://127.0.0.1:3001/api/ssh-audit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host: target, port }),
-  });
-  return res.json();
+  throw new Error('SSH audit is only available in the Electron app.');
 }
 
 // ============================================================

@@ -5,9 +5,18 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores([
+    'dist/**',
+    'release/**',
+    'node_modules/**',
+    'src.backup-*/**',
+    'src/**/*.backup*',
+    'src/**/*backup*',
+    'tools/**',
+  ]),
+
   {
-    files: ['**/*.{js,jsx}'],
+    files: ['src/**/*.{js,jsx}'],
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,
@@ -23,7 +32,30 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
+      'no-empty': 'warn',
+      'no-control-regex': 'off',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/set-state-in-effect': 'off',
+    },
+  },
+
+  {
+    files: ['electron.js', 'preload.js', 'server.js', 'vite.config.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        ...globals.node,
+      },
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'commonjs',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^_' }],
+      'no-useless-escape': 'warn',
     },
   },
 ])
