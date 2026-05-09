@@ -1,7 +1,7 @@
 const LANGS = {
   en: {
     appName: "SysAI",
-    tagline: "AI-Powered Linux Sysadmin Toolkit",
+    tagline: "Operational AI Workspace",
     searchPlaceholder: "Search tools...",
     settings: "Settings",
     home: "Home",

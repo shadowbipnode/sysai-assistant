@@ -43,6 +43,9 @@ function App() {
   
   const { toast, showToast, hideToast } = useToast();
 
+
+
+
   // Carica impostazioni salvate
   useEffect(() => {
     const loadSettings = async () => {
@@ -840,6 +843,8 @@ function App() {
                   fontSize: 14,
                 }}
               />
+              
+
               <span style={{
                 padding: "4px 8px", borderRadius: 8, border: `1px solid ${border}`,
                 color: text2, fontSize: 10, fontWeight: 800,

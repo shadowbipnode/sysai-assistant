@@ -7,6 +7,40 @@ const ScriptBuilder = ({ t, onGenerate, onBack }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
 
+  const downloadTextFile = (filename, content, mimeType = "text/plain") => {
+    const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename || "script.sh";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const normalizeScriptFilename = (filename, selectedType) => {
+    const fallbackExt =
+      /python/i.test(selectedType) ? "py" :
+      /powershell/i.test(selectedType) ? "ps1" :
+      /node|javascript/i.test(selectedType) ? "js" :
+      "sh";
+
+    const safeName = String(filename || `script.${fallbackExt}`)
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .replace(/^_+/, "");
+
+    if (/\.[a-zA-Z0-9]+$/.test(safeName)) return safeName;
+    return `${safeName}.${fallbackExt}`;
+  };
+
+  const exportScriptFile = () => {
+    if (!result?.script) return;
+    const selectedType = t.scriptBuilderPage.types[scriptType] || "bash";
+    const filename = normalizeScriptFilename(result.filename, selectedType);
+    downloadTextFile(filename, result.script, "text/plain");
+  };
+
   const handleGenerate = async () => {
     if (!description.trim()) return;
     setAnalyzing(true);
@@ -76,10 +110,16 @@ const ScriptBuilder = ({ t, onGenerate, onBack }) => {
               <span style={{ fontSize: 12, fontWeight: 600, color: "#00D4AA" }}>
                 📄 {result.filename || "script.sh"}
               </span>
-              <button onClick={() => navigator.clipboard.writeText(result.script)} style={{
-                background: "none", border: "1px solid #00D4AA44", borderRadius: 6,
-                color: "#00D4AA", padding: "4px 12px", fontSize: 11, cursor: "pointer",
-              }}>📋 Copy</button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={exportScriptFile} style={{
+                  background: "none", border: "1px solid #38BDF844", borderRadius: 6,
+                  color: "#38BDF8", padding: "4px 12px", fontSize: 11, cursor: "pointer",
+                }}>⬇ Export file</button>
+                <button onClick={() => navigator.clipboard.writeText(result.script)} style={{
+                  background: "none", border: "1px solid #00D4AA44", borderRadius: 6,
+                  color: "#00D4AA", padding: "4px 12px", fontSize: 11, cursor: "pointer",
+                }}>📋 Copy</button>
+              </div>
             </div>
             <pre style={{
               padding: 20, fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
