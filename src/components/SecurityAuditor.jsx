@@ -77,7 +77,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           if (scanResult.success) {
             updateProgress(65, "Parsing port scan results...");
             const output = formatPortResults(scanResult);
-            updateProgress(85, "Generating operational report...");
+            updateProgress(85, "AI analysis in progress. Local models may take longer...");
             response = await onScan(targetHost, scanType, output);
           } else {
             response = { report: `Errore scan: ${scanResult.error}`, recommendations: "Verifica che il target sia raggiungibile" };
@@ -88,7 +88,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           if (scanResult.success) {
             updateProgress(65, "Parsing TLS certificate data...");
             const output = formatTlsCheck(scanResult);
-            updateProgress(85, "Generating operational report...");
+            updateProgress(85, "AI analysis in progress. Local models may take longer...");
             response = await onScan(targetHost, scanType, output);
           } else {
             response = { report: `Errore TLS: ${scanResult.error}`, recommendations: "Verifica che il target supporti HTTPS" };
@@ -98,7 +98,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           scanResult = await sshAudit(targetHost, 22);
           if (scanResult.success) {
             updateProgress(70, "Parsing SSH audit output...");
-            updateProgress(85, "Generating operational report...");
+            updateProgress(85, "AI analysis in progress. Local models may take longer...");
             response = await onScan(targetHost, scanType, scanResult.output);
           } else {
             response = { report: `Errore SSH: ${scanResult.output}`, recommendations: "Verifica che il target abbia SSH sulla porta 22" };

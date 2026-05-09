@@ -653,8 +653,13 @@ SCAN ANALYSIS REQUIREMENTS:
 - Do not claim vulnerabilities that are not visible in the scan.
 - Distinguish exposure from exploitability.
 - Prioritize internet-exposed management ports, weak TLS/SSH algorithms, obsolete protocols, and dangerous services.
-- Include safe verification and remediation steps.
-- Include rollback for firewall/config changes.
+- Treat this as a REMOTE OBSERVATION unless the user explicitly states they own/manage the target.
+- Do NOT assume administrative control over ${targetHost}.
+- Avoid direct remediation commands that modify the target unless ownership/control is explicitly stated.
+- Use conditional language such as "If this is your infrastructure..." for remediation guidance.
+- For third-party/public targets, focus on observation, risk interpretation, responsible disclosure, and authorized testing boundaries.
+- Include safe verification steps that do not require privileged access to the remote system unless ownership is stated.
+- Include rollback only for changes the user would make on infrastructure they control; otherwise say "No rollback needed for read-only remote observation."
 
 Respond STRICTLY with this JSON format:
 {
