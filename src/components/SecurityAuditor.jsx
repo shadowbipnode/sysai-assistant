@@ -10,7 +10,12 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
   const [scanType, setScanType] = useState("ports");
   const [scanPorts, setScanPorts] = useState("22,80,443,3306,5432");
   const [analyzing, setAnalyzing] = useState(false);
+  const [progress, setProgress] = useState(null);
   const [result, setResult] = useState(null);
+
+  const updateProgress = (percent, label) => {
+    setProgress({ percent, label });
+  };
 
   const formatTlsCheck = (result) => {
     let output = `TLS Check for ${result.host}:${result.port}\n`;
@@ -54,33 +59,46 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
     if (mode === 1 && !targetHost.trim()) return;
     
     setAnalyzing(true);
+    setResult(null);
+    updateProgress(5, "Preparing audit workflow...");
     let response;
     
     if (mode === 0) {
       const inputTypeName = t.securityAuditorPage.types[inputType];
+      updateProgress(35, "Analyzing configuration...");
       response = await onAudit(inputTypeName, sourceText);
+      updateProgress(95, "Preparing operational report...");
     } else {
       try {
         let scanResult;
         if (scanType === "ports") {
+          updateProgress(20, "Running port scan...");
           scanResult = await portScan(targetHost, { ports: scanPorts });
           if (scanResult.success) {
+            updateProgress(65, "Parsing port scan results...");
             const output = formatPortResults(scanResult);
+            updateProgress(85, "Generating operational report...");
             response = await onScan(targetHost, scanType, output);
           } else {
             response = { report: `Errore scan: ${scanResult.error}`, recommendations: "Verifica che il target sia raggiungibile" };
           }
         } else if (scanType === "ssl") {
+          updateProgress(20, "Running TLS handshake check...");
           scanResult = await tlsCheck(targetHost, 443);
           if (scanResult.success) {
+            updateProgress(65, "Parsing TLS certificate data...");
             const output = formatTlsCheck(scanResult);
+            updateProgress(85, "Generating operational report...");
             response = await onScan(targetHost, scanType, output);
           } else {
             response = { report: `Errore TLS: ${scanResult.error}`, recommendations: "Verifica che il target supporti HTTPS" };
           }
         } else if (scanType === "ssh") {
+          updateProgress(20, "Running SSH audit...");
           scanResult = await sshAudit(targetHost, 22);
           if (scanResult.success) {
+            updateProgress(70, "Parsing SSH audit output...");
+            updateProgress(85, "Generating operational report...");
             response = await onScan(targetHost, scanType, scanResult.output);
           } else {
             response = { report: `Errore SSH: ${scanResult.output}`, recommendations: "Verifica che il target abbia SSH sulla porta 22" };
@@ -91,8 +109,10 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
       }
     }
     
+    updateProgress(100, "Audit complete.");
     setResult(response);
     setAnalyzing(false);
+    setTimeout(() => setProgress(null), 700);
   };
 
   return (
@@ -239,6 +259,44 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
       }}>
         {analyzing ? t.securityAuditorPage.analyzing : t.securityAuditorPage.analyze}
       </button>
+
+      {analyzing && progress && (
+        <div style={{
+          marginTop: 16,
+          background: "#131720",
+          border: "1px solid #1E2535",
+          borderRadius: 14,
+          padding: 14,
+        }}>
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 10,
+            fontSize: 12,
+            color: "#8B95A8",
+            fontWeight: 600,
+          }}>
+            <span>⏳ {progress.label}</span>
+            <span>{progress.percent}%</span>
+          </div>
+          <div style={{
+            height: 8,
+            background: "#0B0E14",
+            borderRadius: 999,
+            overflow: "hidden",
+            border: "1px solid #1E2535",
+          }}>
+            <div style={{
+              width: `${progress.percent}%`,
+              height: "100%",
+              background: "linear-gradient(90deg, #00D4AA, #22d3ee)",
+              borderRadius: 999,
+              transition: "width 0.25s ease",
+            }} />
+          </div>
+        </div>
+      )}
 
       {result && (
         <div style={{ marginTop: 24, animation: "slideInRight 0.3s ease" }}>

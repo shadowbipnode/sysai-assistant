@@ -416,18 +416,48 @@ async function sshAudit(host, port = 22) {
       }
 
       // Fallback for environments where ssh-audit is a Python script instead of a native binary.
-      execFile('python3', [sshAuditBin, ...args], options, (pythonError, pythonStdout, pythonStderr) => {
-        if (pythonStdout || pythonStderr) {
-          resolve({ success: true, output: pythonStdout || pythonStderr });
+      const pythonCandidates = process.platform === 'win32'
+        ? ['python', 'py']
+        : ['python3', 'python'];
+
+      const tryPythonFallback = (index = 0) => {
+        if (index >= pythonCandidates.length) {
+          const installHint = process.platform === 'win32'
+            ? 'Python is required for SSH Audit on this Windows build. Install Python from python.org or enable the Windows Python launcher, then restart SysAI.'
+            : 'Python is required for SSH Audit. Install python3 and restart SysAI.';
+
+          resolve({
+            success: false,
+            output: installHint,
+            error: installHint,
+            fallback: true,
+            dependencyMissing: 'python',
+          });
           return;
         }
 
-        resolve({
-          success: false,
-          output: 'ssh-audit is not available or could not be executed on this system.',
-          fallback: true,
+        const pythonBin = pythonCandidates[index];
+        execFile(pythonBin, [sshAuditBin, ...args], options, (pythonError, pythonStdout, pythonStderr) => {
+          const combinedOutput = pythonStdout || pythonStderr;
+
+          if (combinedOutput && !/python was not found|not recognized|no such file|enoent/i.test(combinedOutput)) {
+            resolve({ success: true, output: combinedOutput, fallback: true, python: pythonBin });
+            return;
+          }
+
+          if (pythonError && pythonError.code !== 'ENOENT') {
+            const errorOutput = pythonStderr || pythonError.message || '';
+            if (errorOutput && !/python was not found|not recognized|no such file|enoent/i.test(errorOutput)) {
+              resolve({ success: false, output: errorOutput, error: errorOutput, fallback: true, python: pythonBin });
+              return;
+            }
+          }
+
+          tryPythonFallback(index + 1);
         });
-      });
+      };
+
+      tryPythonFallback();
     });
   });
 }
