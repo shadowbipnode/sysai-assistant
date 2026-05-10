@@ -302,9 +302,14 @@ SysAI avoids acting as a middleman, but cannot control external provider behavio
 
 ### Windows beta
 
-* Portable/unpacked ZIP build
+SysAI currently provides:
 
-Windows support is currently beta. Unsigned builds may trigger SmartScreen warnings.
+- Windows NSIS installer
+- portable/unpacked ZIP build
+
+Windows support is currently in beta.
+
+Because builds are not yet code-signed, Windows SmartScreen may display a warning during first launch.
 
 ### RPM
 
