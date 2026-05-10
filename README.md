@@ -13,6 +13,14 @@
 </p>
 
 <p align="center">
+  <img src="assets/sysai-demo.gif" alt="SysAI Demo" width="100%">
+</p>
+
+<p align="center">
+  <strong>Environment-aware diagnostics • rollback-aware remediation • structured operational workflows</strong>
+</p>
+
+<p align="center">
   <a href="#-why-sysai">Why SysAI</a> •
   <a href="#-what-makes-sysai-different">What makes SysAI different?</a> •
   <a href="#-features">Features</a> •
