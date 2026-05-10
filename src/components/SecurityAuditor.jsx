@@ -295,6 +295,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
               transition: "width 0.25s ease",
             }} />
           </div>
+
         </div>
       )}
 
