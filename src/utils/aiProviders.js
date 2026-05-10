@@ -1,3 +1,5 @@
+import { detectOperationalContext, formatOperationalContext } from './environmentDetection';
+
 /**
  * SysAI - AI Provider Configuration & Prompt Engineering
  * 
@@ -173,15 +175,36 @@ CONFIDENCE CALIBRATION:
 
 function getEnvironmentContext(inputText, selectedContext = '') {
   const env = detectEnvironmentSignals(inputText, selectedContext);
+
+  const operationalContext = detectOperationalContext(`
+${selectedContext}
+
+${inputText}
+`);
+
+  const formattedOperationalContext = formatOperationalContext(operationalContext);
+
   return `
 ENVIRONMENT-AWARE CONTEXT:
 Detected environments/stacks: ${env.names.length ? env.names.join(', ') : 'unknown'}
+
 Detection reasons:
 ${env.text}
 
+ADVANCED OPERATIONAL CONTEXT:
+${formattedOperationalContext || 'No additional operational context detected.'}
+
 ENVIRONMENT-SPECIFIC GUIDANCE:
+- Prefer read-only diagnostics before service-impacting remediation.
+- If ownership/control is uncertain, treat findings as observational.
+- Distinguish exposure from exploitability.
+- Prefer reversible operations and verification-first workflows.
+- Prefer the safest next-best-action before aggressive remediation.
+
+STACK-SPECIFIC GUIDANCE:
 - If Docker/Compose is detected, prefer docker ps, docker logs, docker inspect, docker compose ps/logs before systemctl assumptions.
-- For Docker bind mounts with permission denied, first inspect ls -ln/stat/id/docker inspect output before chmod/chown. On SELinux systems, include getenforce and ls -Z as optional checks.
+- For Docker bind mounts with permission denied, first inspect ls -ln/stat/id/docker inspect output before chmod/chown.
+- If Kubernetes is detected, prefer kubectl get/describe/logs before restart/delete operations.
 - If systemd is detected, prefer systemctl status, journalctl -u, systemctl is-active, and unit-specific checks.
 - If nginx/reverse-proxy is detected, distinguish proxy failure from backend application failure and verify both upstream and nginx config.
 - If Bitcoin Core is detected, consider IBD/sync, RPC auth, pruning, ZMQ, disk, Tor-only networking, and debug.log signals.
@@ -250,7 +273,7 @@ function detectLogSignals(logText) {
   return {
     detected: signals.map(s => s.name).join(', ') || 'unknown',
     reasons: signals.map(s => `- ${s.name}: ${s.reason}`).join('\n') || '- No strong stack signature detected.',
-    importantLines: errorLines.join('\n') || 'No obvious ERROR/WARN/FATAL lines extracted.',
+importantLines: errorLines.join('\n') || 'No obvious ERROR/WARN/FATAL lines extracted.',
     ports: ports.join(', ') || 'none detected',
   };
 }
@@ -491,8 +514,10 @@ ${problem}
 TROUBLESHOOTING REQUIREMENTS:
 - Start with the safest read-only check.
 - Separate likely causes from assumptions.
+- If Docker/Compose and nginx/reverse proxy are both detected, FIRST inspect compose/container state and upstream reachability before checking or restarting system services.
+- For Docker/Compose incidents, prefer this order: docker compose ps -a -> docker ps -a -> docker compose logs -> docker inspect -> nginx error logs -> upstream curl -> only then systemctl/journalctl.
 - If the environment appears Docker/Compose, include Docker checks before systemd restarts.
-- If the environment appears systemd, include systemctl/journalctl checks.
+- If the environment appears systemd, include systemctl/journalctl checks, but do not make systemctl the first action when container/upstream evidence is stronger.
 - If Bitcoin/LND/Tor is involved, use domain-specific checks and avoid dangerous wallet/channel operations.
 - Provide a clear stop condition: how the user knows the issue is fixed.
 - For Docker permission problems, prioritize: ls -ln/stat -> docker inspect user/mounts -> id/UID mapping -> optional SELinux/AppArmor checks -> only then ownership/permission changes.
