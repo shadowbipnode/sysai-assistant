@@ -19,6 +19,7 @@ import LicenseSettings from './components/LicenseSettings';
 import ProGate from './components/ProGate';
 import { useHistory } from './hooks/useHistory';
 import History from './components/History';
+import CommandPalette from "./components/CommandPalette";
 
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
   const [systemProfile, setSystemProfile] = useState("");
   const [showProBanner, setShowProBanner] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     // License state
   const license = useLicense();
   const history = useHistory();
@@ -601,6 +603,12 @@ function App() {
     >
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
 
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onNavigate={(nextPage) => setPage(nextPage)}
+      />
+
       <nav className="sysai-topbar" style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "12px 22px", background: "rgba(19, 23, 32, 0.82)", borderBottom: `1px solid ${border}`,
@@ -844,6 +852,25 @@ function App() {
                 }}
               />
               
+
+              <button
+                onClick={() => setCommandPaletteOpen(true)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 10px",
+                  borderRadius: 10,
+                  border: `1px solid ${border}`,
+                  background: "rgba(255,255,255,0.03)",
+                  color: text2,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                ⌘ Palette
+              </button>
 
               <span style={{
                 padding: "4px 8px", borderRadius: 8, border: `1px solid ${border}`,
