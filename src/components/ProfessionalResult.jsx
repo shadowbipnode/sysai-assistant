@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 const severityColors = {
   LOW: "#00D4AA",
   MEDIUM: "#FBBF24",
@@ -151,7 +153,8 @@ export const ResultPill = ({ label, value, color }) => {
   );
 };
 
-export const ResultSection = ({ title, children, accent = "#1E2535", copyText }) => {
+export const ResultSection = ({ title, children, accent = "#1E2535", copyText, defaultCollapsed = false }) => {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   if (!children) return null;
   return (
     <div style={{
@@ -162,7 +165,20 @@ export const ResultSection = ({ title, children, accent = "#1E2535", copyText })
         display: "flex", justifyContent: "space-between", alignItems: "center",
         padding: "10px 16px", background: `${accent}33`,
       }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: accent }}>{title}</span>
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          style={{
+            background: "none",
+            border: "none",
+            color: accent,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          {collapsed ? "▸" : "▾"} {title}
+        </button>
         {copyText && (
           <button onClick={() => navigator.clipboard.writeText(copyText)} style={{
             background: "none", border: `1px solid ${accent}66`, borderRadius: 6,
@@ -170,7 +186,7 @@ export const ResultSection = ({ title, children, accent = "#1E2535", copyText })
           }}>📋 Copy</button>
         )}
       </div>
-      <div style={{ padding: 18 }}>{children}</div>
+      {!collapsed && <div style={{ padding: 18 }}>{children}</div>}
     </div>
   );
 };
