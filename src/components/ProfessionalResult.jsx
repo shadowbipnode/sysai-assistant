@@ -97,6 +97,7 @@ const buildMarkdownReport = (result) => {
     if (requiresSudo !== undefined) md += `- Requires sudo: ${requiresSudo ? "yes" : "no"}\n`;
     if (destructive !== undefined) md += `- Destructive: ${destructive === true ? "yes" : destructive === false ? "no" : destructive}\n`;
     if (detectedStack.length) md += `- Detected environment: ${detectedStack.join(", ")}\n`;
+    if (result.remote_observation === true || result.ownership_unknown === true) md += `- Mode: Remote observation\n`;
     md += `\n`;
   }
 
@@ -217,6 +218,13 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
   const requiresSudo = first(result.requires_sudo, result.sudo_required);
   const destructive = first(result.destructive, result.destructive_level);
   const detectedStack = asArray(result.detected_stack || result.environment || result.detected_environment);
+  const combinedResultText = JSON.stringify(result).toLowerCase();
+  const isRemoteObservation =
+    result.remote_observation === true ||
+    result.ownership_unknown === true ||
+    combinedResultText.includes("remote observation") ||
+    combinedResultText.includes("third-party") ||
+    combinedResultText.includes("if this is your infrastructure");
   const nextBestAction = first(result.next_best_action, result.first_step, result.check_command);
   const summary = first(result.summary, result.diagnosis && !result.root_cause ? result.diagnosis : null);
   const rootCause = first(result.root_cause, result.cause);
@@ -267,6 +275,7 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
         {confidence && <ResultPill label="CONFIDENCE" value={confidence} color={confidenceColor} />}
         {requiresSudo !== undefined && <ResultPill label="SUDO" value={requiresSudo ? "YES" : "NO"} color={requiresSudo ? "#FBBF24" : "#00D4AA"} />}
         {destructive !== undefined && <ResultPill label="DESTRUCTIVE" value={destructive === true ? "YES" : destructive === false ? "NO" : destructive} color={destructive ? "#FF4D6A" : "#00D4AA"} />}
+        {isRemoteObservation && <ResultPill label="MODE" value="REMOTE OBSERVATION" color="#38BDF8" />}
       </div>
 
       {detectedStack.length > 0 && (
