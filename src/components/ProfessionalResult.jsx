@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const severityColors = {
   LOW: "#00D4AA",
@@ -153,8 +153,13 @@ export const ResultPill = ({ label, value, color }) => {
   );
 };
 
-export const ResultSection = ({ title, children, accent = "#1E2535", copyText, defaultCollapsed = false }) => {
+export const ResultSection = ({ title, children, accent = "#1E2535", copyText, defaultCollapsed = false, collapseSignal = null }) => {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+
+  useEffect(() => {
+    if (!collapseSignal) return;
+    setCollapsed(collapseSignal.mode === "collapse");
+  }, [collapseSignal]);
   if (!children) return null;
   return (
     <div style={{
@@ -224,7 +229,12 @@ const textSection = (text) => text ? (
 ) : null;
 
 const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = false }) => {
+  const [collapseSignal, setCollapseSignal] = useState(null);
+
   if (!result) return null;
+
+  const collapseAll = () => setCollapseSignal({ mode: "collapse", ts: Date.now() });
+  const expandAll = () => setCollapseSignal({ mode: "expand", ts: Date.now() });
 
   const severity = first(result.severity, result.risk_level, result.risk, result.destructive ? "HIGH" : null);
   const normalizedSeverity = typeof severity === "string" ? severity.toUpperCase() : severity;
@@ -269,6 +279,38 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
           marginBottom: 12,
         }}>
           <button
+            onClick={collapseAll}
+            style={{
+              background: "#1A1F2E",
+              border: "1px solid #1E2535",
+              borderRadius: 8,
+              color: "#B8C0D0",
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              marginRight: 8,
+            }}
+          >
+            ▸ Collapse all
+          </button>
+          <button
+            onClick={expandAll}
+            style={{
+              background: "#1A1F2E",
+              border: "1px solid #1E2535",
+              borderRadius: 8,
+              color: "#B8C0D0",
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              marginRight: 8,
+            }}
+          >
+            ▾ Expand all
+          </button>
+          <button
             onClick={() => exportMarkdownReport(result)}
             style={{
               background: "#1A1F2E",
@@ -312,91 +354,91 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
       )}
 
       {summary && (
-        <ResultSection title="SUMMARY" accent="#8B95A8">
+        <ResultSection collapseSignal={collapseSignal} title="SUMMARY" accent="#8B95A8">
           {textSection(summary)}
         </ResultSection>
       )}
 
       {nextBestAction && (
-        <ResultSection title="NEXT BEST ACTION" accent="#00D4AA" copyText={nextBestAction}>
+        <ResultSection collapseSignal={collapseSignal} title="NEXT BEST ACTION" accent="#00D4AA" copyText={nextBestAction}>
           <p style={{ fontSize: 14, color: "#B8C0D0", whiteSpace: "pre-wrap", margin: 0, fontWeight: 600 }}>{nextBestAction}</p>
         </ResultSection>
       )}
 
       {rootCause && (
-        <ResultSection title="ROOT CAUSE" accent="#FBBF24">
+        <ResultSection collapseSignal={collapseSignal} title="ROOT CAUSE" accent="#FBBF24">
           {textSection(rootCause)}
         </ResultSection>
       )}
 
       {report && (
-        <ResultSection title="REPORT" accent="#60A5FA" copyText={report}>
+        <ResultSection collapseSignal={collapseSignal} title="REPORT" accent="#60A5FA" copyText={report}>
           {textSection(report)}
         </ResultSection>
       )}
 
       {evidence.length > 0 && (
-        <ResultSection title="EVIDENCE" accent="#60A5FA">
+        <ResultSection collapseSignal={collapseSignal} title="EVIDENCE" accent="#60A5FA">
           <ResultList items={evidence} />
         </ResultSection>
       )}
 
       {findings.length > 0 && (
-        <ResultSection title="FINDINGS" accent="#FF4D6A">
+        <ResultSection collapseSignal={collapseSignal} title="FINDINGS" accent="#FF4D6A">
           <ResultList items={findings} />
         </ResultSection>
       )}
 
       {!hidePrimaryArtifact && fix && (
-        <ResultSection title="FIX" accent="#00D4AA" copyText={fix}>
+        <ResultSection collapseSignal={collapseSignal} title="FIX" accent="#00D4AA" copyText={fix}>
           <CodeBlock text={fix} />
         </ResultSection>
       )}
 
       {recommendations && (
-        <ResultSection title="RECOMMENDATIONS" accent="#FF4D6A" copyText={recommendations}>
+        <ResultSection collapseSignal={collapseSignal} title="RECOMMENDATIONS" accent="#FF4D6A" copyText={recommendations}>
           {textSection(recommendations)}
         </ResultSection>
       )}
 
       {hardeningCommands && (
-        <ResultSection title="HARDENING COMMANDS" accent="#FF4D6A" copyText={hardeningCommands}>
+        <ResultSection collapseSignal={collapseSignal} title="HARDENING COMMANDS" accent="#FF4D6A" copyText={hardeningCommands}>
           <CodeBlock text={hardeningCommands} />
         </ResultSection>
       )}
 
       {verification && (
-        <ResultSection title="VERIFY" accent="#38BDF8" copyText={verification}>
+        <ResultSection collapseSignal={collapseSignal} title="VERIFY" accent="#38BDF8" copyText={verification}>
           <CodeBlock text={verification} />
         </ResultSection>
       )}
 
       {rollback && (
-        <ResultSection title="ROLLBACK" accent="#C084FC" copyText={rollback}>
+        <ResultSection collapseSignal={collapseSignal} title="ROLLBACK" accent="#C084FC" copyText={rollback}>
           <CodeBlock text={rollback} />
         </ResultSection>
       )}
 
       {safetyNotes && (
-        <ResultSection title="SAFETY NOTES" accent="#FBBF24">
+        <ResultSection collapseSignal={collapseSignal} title="SAFETY NOTES" accent="#FBBF24">
           {textSection(safetyNotes)}
         </ResultSection>
       )}
 
       {prevention && (
-        <ResultSection title="PREVENTION" accent="#8B95A8">
+        <ResultSection collapseSignal={collapseSignal} title="PREVENTION" accent="#8B95A8">
           {textSection(prevention)}
         </ResultSection>
       )}
 
       {assumptions.length > 0 && (
-        <ResultSection title="ASSUMPTIONS" accent="#8B95A8">
+        <ResultSection collapseSignal={collapseSignal} title="ASSUMPTIONS" accent="#8B95A8">
           <ResultList items={assumptions} />
         </ResultSection>
       )}
 
       {followUps.length > 0 && (
-        <ResultSection title={result.additional_logs_optional || confidence === "HIGH" ? "OPTIONAL FOLLOW-UP CHECKS" : "FOLLOW-UP NEEDED"} accent={result.additional_logs_optional || confidence === "HIGH" ? "#8B95A8" : "#FF4D6A"}>
+        <ResultSection collapseSignal={collapseSignal} title={result.additional_logs_optional || confidence === "HIGH" ? "OPTIONAL FOLLOW-UP CHECKS" : "FOLLOW-UP NEEDED"} accent={result.additional_logs_optional || confidence === "HIGH" ? "#8B95A8" : "#FF4D6A"}>
           <ResultList items={followUps} />
         </ResultSection>
       )}
