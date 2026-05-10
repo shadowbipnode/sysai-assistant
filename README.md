@@ -451,25 +451,25 @@ npm run electron:build:all
 * [x] multilingual support
 * [x] local-first architecture
 * [x] Windows beta build
+* [x] Windows NSIS installer
+* [x] GitHub Actions Windows build workflow
 * [x] Ollama local-provider validation
 * [x] Content Security Policy hardening
 * [x] safe external URL handling
 * [x] scanner IPC-only security model
 * [x] lint workflow
+* [x] export to `.md`, `.sh`, `.py`, `.ps1`, `.js`
+* [x] command palette MVP
 
 ## Planned
 
-* [ ] Windows installer/signing
+* [ ] Windows code signing / SmartScreen reputation
 * [ ] macOS build
-* [ ] export to `.sh`, `.conf`, `.md`
-* [ ] command palette
 * [ ] terminal-oriented workspace mode
 * [ ] onboarding flows
-* [ ] smarter operational context inference
 * [ ] dedicated Bitcoin/Lightning operational profiles
 * [ ] infrastructure reporting/export system
 * [ ] favorites/snippet library
-
 ---
 
 # 🤝 Contributing
