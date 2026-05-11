@@ -5,11 +5,11 @@
 <h1 align="center">SysAI</h1>
 
 <p align="center">
-  <strong>Operationally-aware AI workspace for Linux sysadmins and self-hosted infrastructure</strong>
+  <strong>Operationally-aware AI workspace for infrastructure, security and self-hosted operations</strong>
 </p>
 
 <p align="center">
-  <em>Built by a sysadmin, for sysadmins.</em>
+  <em>Built for infrastructure operators, self-hosters and security workflows.</em>
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@
 
 # ❓ Why SysAI
 
-Most AI tools for Linux administration still behave like generic chatbots.
+Most AI tools for infrastructure and operational workflows still behave like generic chatbots.
 
 SysAI tries to solve a different problem.
 
@@ -63,7 +63,7 @@ The goal is making AI outputs feel operationally useful instead of conversationa
 | Huge text blobs           | Structured operational output               |
 | Manual risk evaluation    | Risk + confidence analysis                  |
 | Manually ask for rollback | Built-in verification and rollback guidance |
-| Browser-based workflow    | Dedicated Linux operations workspace        |
+| Browser-based workflow    | Dedicated operational workspace             |
 | Chat-first                | Workflow-first                              |
 
 ---
@@ -80,11 +80,13 @@ Examples:
 * systemd
 * reverse proxies
 * Linux services
+* Windows servers and workstations
+* PowerShell environments
 * networking stacks
 * Bitcoin / Lightning infrastructure
 * self-hosted environments
 
-This allows SysAI to generate more realistic operational workflows instead of generic Linux suggestions.
+This allows SysAI to generate more realistic operational workflows instead of generic infrastructure suggestions.
 
 ---
 
@@ -393,7 +395,7 @@ Operational awareness improves outputs significantly, but does not replace real 
 
 SysAI is especially useful for:
 
-* Linux sysadmins
+*  Linux sysadmins
 * self-hosted users
 * homelab operators
 * DevOps engineers
@@ -489,7 +491,7 @@ npm run electron:build:all
 
 Feedback, testing and contributions are welcome.
 
-This project is evolving quickly and real-world Linux/sysadmin feedback is extremely valuable.
+This project is evolving quickly and real-world infrastructure and operational feedback is extremely valuable.
 
 ---
 
@@ -500,6 +502,6 @@ MIT
 ---
 
 <p align="center">
-Built with ⚡ by a sysadmin, for sysadmins.
+Built with ⚡ for infrastructure operators, self-hosters and security workflows.
 </p>
 
