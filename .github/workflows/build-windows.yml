@@ -1,4 +1,4 @@
-name: Build Windows Installer
+name: Build Windows Release
 
 on:
   workflow_dispatch:
@@ -26,10 +26,14 @@ jobs:
       - name: Build Windows NSIS installer
         run: npm run electron:build:win:nsis
 
-      - name: Upload Windows installer artifact
+      - name: Build Windows portable package
+        run: npm run electron:build:win:portable
+
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: sysai-windows-installer
+          name: sysai-windows-release
           path: |
             release/*.exe
+            release/*.zip
             release/*.yml
