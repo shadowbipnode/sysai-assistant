@@ -20,6 +20,7 @@ import ProGate from './components/ProGate';
 import { useHistory } from './hooks/useHistory';
 import History from './components/History';
 import CommandPalette from "./components/CommandPalette";
+import QuickModelSwitcher from "./components/QuickModelSwitcher";
 import OperationalContextPanel from "./components/OperationalContextPanel";
 
 
@@ -37,6 +38,7 @@ function App() {
   const [showProBanner, setShowProBanner] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
     // License state
   const license = useLicense();
   const history = useHistory();
@@ -603,6 +605,26 @@ function App() {
       }}
     >
       {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
+      <QuickModelSwitcher
+        open={quickSwitcherOpen}
+        onClose={() => setQuickSwitcherOpen(false)}
+        providers={AI_PROVIDERS}
+        defaultProvider={defaultProvider}
+        selectedModels={selectedModels}
+        availableModels={availableModels}
+        loadingModels={loadingModels}
+        onSetDefaultProvider={setDefaultProvider}
+        onSetSelectedModel={(providerId, modelId) =>
+          setSelectedModels((prev) => ({
+            ...prev,
+            [providerId]: modelId,
+          }))
+        }
+        onOpenSettings={() => {
+          setQuickSwitcherOpen(false);
+          setPage("settings");
+        }}
+      />  
 
       <CommandPalette
         open={commandPaletteOpen}
@@ -650,7 +672,7 @@ function App() {
               cursor: "pointer",
               minWidth: 215,
             }}
-            onClick={() => setPage("settings")}
+            onClick={() => setQuickSwitcherOpen(true)}
           >
             <div style={{
               display: "flex", alignItems: "center", gap: 7,

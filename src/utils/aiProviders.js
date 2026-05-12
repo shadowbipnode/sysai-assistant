@@ -614,10 +614,13 @@ Respond STRICTLY with this JSON format:
 
 export function buildSecurityAuditPrompt(configOrDescription, auditType, scanResults, systemProfile, lang) {
   const systemContext = getSystemContext(systemProfile, lang);
+  const operationalContext = buildOperationalContextBlock();
   const environmentContext = getEnvironmentContext(`${auditType}\n${configOrDescription}\n${scanResults || ''}`, 'security audit');
   const scanContext = scanResults ? `\nSCAN RESULTS:\n\`\`\`\n${scanResults}\n\`\`\`` : '';
 
   return `${systemContext}
+
+${operationalContext}
 ${environmentContext}
 ${getProfessionalOutputContract('Security Auditor')}
 
@@ -666,9 +669,12 @@ Respond STRICTLY with this JSON format:
 
 
 export const buildSecurityScanAnalysisPrompt = (targetHost, scanType, scanOutput, systemProfile, lang) => {
+  const operationalContext = buildOperationalContextBlock();
   const environmentContext = getEnvironmentContext(scanOutput, scanType);
 
   return `${getSystemContext(systemProfile, lang)}
+
+${operationalContext}
 ${environmentContext}
 ${getProfessionalOutputContract('Security Scan Analyzer')}
 
