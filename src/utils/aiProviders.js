@@ -1,3 +1,4 @@
+import { buildOperationalContextBlock } from './operationalContextPrompt';
 import { detectOperationalContext, formatOperationalContext } from './environmentDetection';
 
 /**
@@ -280,9 +281,12 @@ importantLines: errorLines.join('\n') || 'No obvious ERROR/WARN/FATAL lines extr
 
 export function buildLogAnalysisPrompt(logText, service, systemProfile, lang) {
   const systemContext = getSystemContext(systemProfile, lang);
+  const operationalContext = buildOperationalContextBlock();
   const signals = detectLogSignals(logText);
 
   return `${systemContext}
+
+${operationalContext}
 
 TASK: Analyze the following system log as a senior production Linux/SRE diagnostic engineer.
 

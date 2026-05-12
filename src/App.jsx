@@ -20,6 +20,7 @@ import ProGate from './components/ProGate';
 import { useHistory } from './hooks/useHistory';
 import History from './components/History';
 import CommandPalette from "./components/CommandPalette";
+import OperationalContextPanel from "./components/OperationalContextPanel";
 
 
 function App() {
@@ -720,6 +721,7 @@ function App() {
                 { icon: "🏠", label: t.home, key: "home" },
                 { icon: "📜", label: `${t.history}${history.count > 0 ? ` (${history.count})` : ''}`, key: "history" },
                 { icon: "⭐", label: t.favorites, key: "favorites" },
+                { icon: "🧠", label: "Operational Context", key: "operationalContext" },
                 { icon: "📎", label: t.snippets, key: "snippets" },
                 { icon: "⚙", label: t.settings, key: "settings" },
               ].map((item) => (
@@ -879,6 +881,23 @@ function App() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 18 }}>
+              {(!searchText || "operational context memory".includes(searchText.toLowerCase())) && (
+                <ModeCard
+                  mode={{
+                    icon: "🧠",
+                    name: "Operational Context",
+                    description: "Local memory for infrastructure profiles, preferences and operational notes."
+                  }}
+                  isFree={true}
+                  accent={accent}
+                  accentDim={accentDim}
+                  surface={surface}
+                  border={border}
+                  text2={text2}
+                  text1={text1}
+                  onClick={() => setPage("operationalContext")}
+                />
+              )}
               {filteredModes.map((key) => {
                 const mode = t.modes[key];
                 return (
@@ -931,6 +950,10 @@ function App() {
             onScan={handleSecurityScan} 
             onBack={() => setPage("home")} 
           />
+        )}
+
+        {page === "operationalContext" && (
+          <OperationalContextPanel />
         )}
 
         {page === "settings" && (
