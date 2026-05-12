@@ -500,12 +500,15 @@ Respond STRICTLY with this JSON format:
 
 export function buildTroubleshootPrompt(problem, previousSteps, systemProfile, lang) {
   const systemContext = getSystemContext(systemProfile, lang);
+  const operationalContext = buildOperationalContextBlock();
   const environmentContext = getEnvironmentContext(problem, 'troubleshooting');
   const prevContext = previousSteps?.length
     ? `\nPREVIOUS DIAGNOSTIC STEPS:\n${previousSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
     : '';
 
   return `${systemContext}
+
+${operationalContext}
 ${environmentContext}
 ${getProfessionalOutputContract('Troubleshooter')}
 

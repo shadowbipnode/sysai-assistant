@@ -1,41 +1,49 @@
 import { loadOperationalContext } from "./operationalContextStore";
 
+const MAX_NOTES_CHARS = 360;
+
+function clean(value) {
+  return String(value || "").trim();
+}
+
+function truncate(value, max = MAX_NOTES_CHARS) {
+  const text = clean(value).replace(/\s+/g, " ");
+  if (text.length <= max) return text;
+  return `${text.slice(0, max).trim()}...`;
+}
+
 export function buildOperationalContextBlock() {
   const context = loadOperationalContext();
 
-  const lines = [];
+  const tags = [];
 
-  if (context.profile?.name) {
-    lines.push(`Environment name: ${context.profile.name}`);
+  const os = clean(context.profile?.os);
+  const primaryUse = clean(context.profile?.primary_use);
+  const notes = truncate(context.notes);
+
+  if (os) tags.push(os);
+  if (primaryUse) tags.push(primaryUse);
+
+  if (Array.isArray(context.profile?.stacks)) {
+    context.profile.stacks
+      .map(clean)
+      .filter(Boolean)
+      .forEach((stack) => tags.push(stack));
   }
 
-  if (context.profile?.os) {
-    lines.push(`Operating system: ${context.profile.os}`);
-  }
+  if (context.preferences?.prefer_read_only_first) tags.push("prefer read-only checks first");
+  if (context.preferences?.avoid_destructive_commands) tags.push("avoid destructive remediation");
+  if (context.preferences?.prefer_docker_compose) tags.push("prefer Docker Compose workflows");
 
-  if (context.profile?.primary_use) {
-    lines.push(`Primary use: ${context.profile.primary_use}`);
-  }
+  const uniqueTags = [...new Set(tags)].slice(0, 12);
 
-  if (
-    Array.isArray(context.profile?.stacks) &&
-    context.profile.stacks.length > 0
-  ) {
-    lines.push(`Infrastructure stack: ${context.profile.stacks.join(", ")}`);
-  }
-
-  if (context.notes?.trim()) {
-    lines.push(`Operational notes: ${context.notes.trim()}`);
-  }
-
-  if (lines.length === 0) {
-    return "";
-  }
+  if (!uniqueTags.length && !notes) return "";
 
   return `
 Operational context:
-${lines.map((l) => `- ${l}`).join("\n")}
+${uniqueTags.length ? `- ${uniqueTags.join("; ")}` : ""}
+${notes ? `- Notes: ${notes}` : ""}
 
-Use this context to improve operational relevance, environment awareness and remediation quality.
+Use this only when relevant. Do not override direct evidence from the current input.
 `;
 }
