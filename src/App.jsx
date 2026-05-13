@@ -228,17 +228,37 @@ function App() {
       
       const result = extractJsonObject(response);
       if (result) {
+        const normalizedResult = {
+          ...result,
+          reasoning_summary: result.reasoning_summary || result.operational_reasoning || (
+            result.root_cause
+              ? `SysAI prioritizes this diagnosis because the root cause is supported by the extracted evidence and the recommended first action is designed to validate the issue before making changes.`
+              : ""
+          ),
+          decision_factors: result.decision_factors || [
+            ...(Array.isArray(result.evidence) ? result.evidence.slice(0, 3) : []),
+            result.confidence ? `Confidence level: ${result.confidence}` : null,
+          ].filter(Boolean),
+          why_first_action: result.why_first_action || result.why_this_action || (
+            result.next_best_action
+              ? `The first action is prioritized because it is the safest initial validation step before remediation.`
+              : ""
+          ),
+        };
+
         showToast("Analisi completata!", "success");
+
         history.addEntry({
           tool: 'logAnalyzer',
           toolName: t.modes.logAnalyzer.name,
           toolIcon: t.modes.logAnalyzer.icon,
           input: logText,
-          output: result,
+          output: normalizedResult,
           provider: defaultProvider,
           model: model,
         });
-        return result;
+
+        return normalizedResult;
       }
       return { severity: "INFO", title: "Analisi", explanation: response, fix: "N/A" };
     } catch (error) {

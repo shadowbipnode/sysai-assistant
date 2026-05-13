@@ -316,6 +316,8 @@ ${logText}
 DIAGNOSTIC REQUIREMENTS:
 - Identify the most likely root cause and explain why.
 - Separate evidence from assumptions.
+- Always include reasoning_summary, decision_factors, and why_first_action for operational reasoning transparency.
+- Do NOT reveal hidden chain-of-thought. Provide concise operational justification only.
 - Give the safest checks first, then fixes.
 - Add one clear next best action: the single first thing the operator should run/do.
 - Include verification commands.
