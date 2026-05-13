@@ -259,6 +259,9 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
   const hardeningCommands = commandText(result.hardening_commands);
   const fix = commandText(first(result.fix_commands, result.commands, result.fix, result.remediation));
   const verification = commandText(first(result.verification_commands, result.verification, result.verify, result.validation_commands, result.check_command));
+  const verificationStrength = first(result.verification_strength, result.verification_trust, result.validation_strength);
+  const verificationReason = first(result.verification_reason, result.verification_trust_reason, result.validation_reason);
+  const verificationLimitations = asArray(result.verification_limitations);
   const rollback = commandText(first(result.rollback_commands, result.rollback));
   const rollbackReversibility = first(result.rollback_reversibility, result.rollback_safety, result.reversibility);
   const rollbackRiskReason = first(result.rollback_risk_reason, result.rollback_risk, result.reversibility_reason);
@@ -272,7 +275,7 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
   const hasReasoningTransparency = reasoningSummary || decisionFactors.length > 0 || whyFirstAction;
   const findings = asArray(result.findings);
   const followUps = asArray(result.additional_logs_needed || result.follow_up_checks || result.follow_up_question);
-  const hasProfessionalFields = normalizedSeverity || confidence || requiresSudo !== undefined || nextBestAction || summary || rootCause || report || fix || verification || rollback || evidence.length || findings.length || assumptions.length || hasReasoningTransparency || followUps.length || safetyNotes || prevention || recommendations || hardeningCommands;
+  const hasProfessionalFields = normalizedSeverity || confidence || requiresSudo !== undefined || nextBestAction || summary || rootCause || report || fix || verification || rollback || evidence.length || findings.length || assumptions.length || hasReasoningTransparency || followUps.length || safetyNotes || prevention || recommendations || hardeningCommands || verificationStrength || verificationReason || verificationLimitations.length;
   if (!hasProfessionalFields) return null;
 
   return (
@@ -433,7 +436,29 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
           <CodeBlock text={hardeningCommands} />
         </ResultSection>
       )}
+      {(verificationStrength || verificationReason || verificationLimitations.length > 0) && (
+  <ResultSection collapseSignal={collapseSignal} title="VERIFICATION TRUST" accent="#38BDF8">
+    {verificationStrength && textSection(`Strength: ${verificationStrength}`)}
 
+    {verificationReason && (
+      <div style={{ marginTop: verificationStrength ? 12 : 0 }}>
+        <div style={{ color: "#8B95A8", fontSize: 12, fontWeight: 800, marginBottom: 8 }}>
+          Reason
+        </div>
+        {textSection(verificationReason)}
+      </div>
+    )}
+
+    {verificationLimitations.length > 0 && (
+      <div style={{ marginTop: 12 }}>
+        <div style={{ color: "#8B95A8", fontSize: 12, fontWeight: 800, marginBottom: 8 }}>
+          Limitations
+        </div>
+        <ResultList items={verificationLimitations} />
+      </div>
+    )}
+  </ResultSection>
+)}
       {verification && (
         <ResultSection collapseSignal={collapseSignal} title="VERIFY" accent="#38BDF8" copyText={verification}>
           <CodeBlock text={verification} />

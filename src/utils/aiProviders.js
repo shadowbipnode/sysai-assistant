@@ -153,6 +153,11 @@ PROFESSIONAL OUTPUT RULES FOR ${toolName}:
 - Do NOT reveal hidden chain-of-thought. Provide concise operational justification only.
 - Reasoning transparency must explain observed signals, assumptions, prioritization, and verification logic.
 - Always include verification commands when commands or changes are suggested.
+- Always include verification trust semantics fields: verification_strength, verification_reason, verification_limitations.
+- verification_strength must use ONLY: STRONG_VERIFICATION, WEAK_VERIFICATION, AMBIGUOUS_VERIFICATION.
+- STRONG_VERIFICATION means the verification directly confirms the intended operational outcome.
+- WEAK_VERIFICATION means the verification is indirect, partial, or only confirms process/status.
+- AMBIGUOUS_VERIFICATION means the verification may pass while the real issue remains unresolved or needs interpretation.
 - Always include rollback guidance. If no rollback is needed, say exactly: "No rollback needed for read-only checks."
 - rollback_reversibility must use ONLY: FULLY_REVERSIBLE, PARTIALLY_REVERSIBLE, NON_REVERSIBLE_WITHOUT_BACKUP. Do not invent extended enum values.
 - Use arrays for command blocks: fix_commands, verification_commands, rollback_commands. Each array item must be one complete shell command or one comment line starting with #.
@@ -368,6 +373,9 @@ Use this exact JSON schema:
   "why_first_action": "Why the next_best_action is the safest first step.",
   "fix_commands": ["# Step 1 - read-only discovery", "command 1", "# Step 2 - safe remediation", "command 2"],
   "verification_commands": ["# Verify the service/result", "command"],
+  "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
+  "verification_reason": "Why the verification is strong, weak, or ambiguous.",
+  "verification_limitations": ["What this verification does not prove"],
   "rollback_commands": ["No rollback needed for read-only checks."],
   "fix": "short human-readable fix summary",
   "verification": "short verification summary",
@@ -414,6 +422,9 @@ Respond STRICTLY with this JSON format:
   "decision_factors": ["observed signal or operational factor that influenced the recommendation"],
   "why_first_action": "Why the next_best_action is the safest first step.",
   "verification_commands": ["command(s) to verify the result"],
+  "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
+  "verification_reason": "Why the verification is strong, weak, or ambiguous.",
+  "verification_limitations": ["What this verification does not prove"],
   "rollback_commands": ["rollback command(s) or No rollback needed for read-only checks."],
   "verification": "short verification summary",
   "rollback": "short rollback summary",
@@ -459,6 +470,9 @@ Response MUST be in this EXACT JSON format:
   "risks": "risks or null",
   "improvements": "safer improvements or null",
   "verification_commands": ["command(s) to verify the command had the intended effect"],
+  "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
+  "verification_reason": "Why the verification is strong, weak, or ambiguous.",
+  "verification_limitations": ["What this verification does not prove"],
   "rollback_commands": ["rollback command(s) or No rollback needed for read-only checks."],
   "verification": "short verification summary or null",
   "rollback": "short rollback summary",
@@ -505,6 +519,9 @@ Respond STRICTLY with this JSON format:
   "decision_factors": ["configuration requirement or operational factor that influenced the recommendation"],
   "why_first_action": "Why the next_best_action is the safest first step.",
   "verification_commands": ["commands to validate/test the config"],
+  "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
+  "verification_reason": "Why the verification is strong, weak, or ambiguous.",
+  "verification_limitations": ["What this verification does not prove"],
   "rollback_commands": ["commands or steps to restore the previous config"],
   "verification": "short validation summary",
   "rollback": "short rollback summary",
@@ -566,6 +583,9 @@ Respond STRICTLY with this JSON format:
   "expected_output": "what the output should look like if this diagnosis is correct",
   "fix_commands": ["# Step 1 - read-only discovery", "command 1", "# Step 2 - safe remediation", "command 2"],
   "verification_commands": ["# Confirm the issue is fixed", "command"],
+  "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
+  "verification_reason": "Why the verification is strong, weak, or ambiguous.",
+  "verification_limitations": ["What this verification does not prove"],
   "rollback_commands": ["# Restore previous state if recorded", "command or explanation"],
   "rollback_reversibility": "FULLY_REVERSIBLE|PARTIALLY_REVERSIBLE|NON_REVERSIBLE_WITHOUT_BACKUP",
   "rollback_risk_reason": "why rollback may fail, be incomplete, or require backups",
@@ -639,6 +659,9 @@ Respond STRICTLY with this JSON format:
   "decision_factors": ["script behavior or operational factor that influenced the recommendation"],
   "why_first_action": "Why the next_best_action is the safest first step.",
   "verification_commands": ["commands to verify script result"],
+  "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
+  "verification_reason": "Why the verification is strong, weak, or ambiguous.",
+  "verification_limitations": ["What this verification does not prove"],
   "rollback_commands": ["rollback commands or No rollback needed for read-only checks."],
   "verification": "short verification summary",
   "rollback": "short rollback summary",
@@ -694,6 +717,9 @@ Respond STRICTLY with this JSON format:
   "hardening_commands": ["additional hardening command or comment line"],
   "hardening": "short hardening summary",
   "verification_commands": ["commands to verify the remediation"],
+  "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
+  "verification_reason": "Why the verification is strong, weak, or ambiguous.",
+  "verification_limitations": ["What this verification does not prove"],
   "rollback_commands": ["rollback commands or No rollback needed for read-only checks."],
   "verification": "short verification summary",
   "rollback": "short rollback summary",
@@ -749,6 +775,9 @@ Respond STRICTLY with this JSON format:
   ],
   "recommendations": "specific recommendations with commands where appropriate",
   "verification_commands": ["commands to verify the remediation"],
+  "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
+  "verification_reason": "Why the verification is strong, weak, or ambiguous.",
+  "verification_limitations": ["What this verification does not prove"],
   "rollback_commands": ["rollback commands or No rollback needed for read-only checks."],
   "verification": "short verification summary",
   "rollback": "short rollback summary",
