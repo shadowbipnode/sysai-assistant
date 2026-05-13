@@ -10,6 +10,8 @@
 // ============================================================
 // COSTANTI
 // ============================================================
+import { getDeviceId } from './deviceIdentity';
+
 const LICENSE_STORAGE_KEY = 'sysai_license';
 const LICENSE_PREFIX = 'SYSAI-';
 
@@ -132,16 +134,25 @@ export async function validateLicense(key) {
   }
 
   // 4. Tutto ok!
-  return {
-    valid: true,
-    type: parsed.payload.t,
-    id: parsed.payload.id,
-    email: parsed.payload.e,
-    created: parsed.payload.c,
-    expires: parsed.payload.x,
-    isPro: true,
-    payload: parsed.payload,
-  };
+  const features = Array.isArray(parsed.payload.features)
+  ? parsed.payload.features
+  : ['all_tools'];
+
+return {
+  valid: true,
+  type: parsed.payload.t,
+  plan: parsed.payload.plan || parsed.payload.t,
+  id: parsed.payload.id,
+  email: parsed.payload.e,
+  created: parsed.payload.c,
+  expires: parsed.payload.x,
+  isPro: ['pro', 'beta'].includes(parsed.payload.t),
+  features,
+  maxActivations: parsed.payload.max_activations || null,
+  activationRequired: Boolean(parsed.payload.activation_required),
+  graceDays: parsed.payload.grace_days || null,
+  payload: parsed.payload,
+};
 }
 
 // ============================================================
@@ -204,11 +215,17 @@ export async function checkLicenseStatus() {
   return {
     valid: true,
     type: result.type,
-    isPro: true,
+    plan: result.plan,
+    isPro: result.isPro,
     id: result.id,
     email: result.email,
     created: result.created,
     expires: result.expires,
+    features: result.features || ['all_tools'],
+    maxActivations: result.maxActivations,
+    activationRequired: result.activationRequired,
+    graceDays: result.graceDays,
+    deviceId: await getDeviceId(),
     daysLeft: result.expires
       ? Math.ceil((new Date(result.expires + 'T23:59:59Z') - new Date()) / 86400000)
       : null,
@@ -241,7 +258,17 @@ export function getCachedStatus() {
 export function isProCached() {
   return _cachedStatus?.isPro || false;
 }
+export function hasFeature(featureName) {
+  const status = getCachedStatus();
 
+  if (!status?.isPro) return false;
+
+  const features = Array.isArray(status.features)
+    ? status.features
+    : [];
+
+  return features.includes('all_tools') || features.includes(featureName);
+}
 export async function activateLicense(key) {
   const result = await validateLicense(key);
 

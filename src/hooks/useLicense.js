@@ -49,8 +49,13 @@ export function useLicense() {
   return {
     isPro: status.isPro,
     isBeta: status.type === 'beta',
-    licenseType: status.type,     // "free" | "pro" | "beta"
-    daysLeft: status.daysLeft,    // null se permanente, N se beta
+    licenseType: status.type,
+    plan: status.plan,
+    features: status.features || [],
+    maxActivations: status.maxActivations,
+    activationRequired: status.activationRequired,
+    graceDays: status.graceDays,
+    daysLeft: status.daysLeft,
     expires: status.expires,
     licenseId: status.id,
     error: status.error,
