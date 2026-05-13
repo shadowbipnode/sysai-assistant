@@ -546,6 +546,8 @@ Respond STRICTLY with this JSON format:
   "fix_commands": ["# Step 1 - read-only discovery", "command 1", "# Step 2 - safe remediation", "command 2"],
   "verification_commands": ["# Confirm the issue is fixed", "command"],
   "rollback_commands": ["# Restore previous state if recorded", "command or explanation"],
+  "rollback_reversibility": "FULLY_REVERSIBLE|PARTIALLY_REVERSIBLE|NON_REVERSIBLE_WITHOUT_BACKUP",
+  "rollback_risk_reason": "why rollback may fail, be incomplete, or require backups",
   "fix": "short human-readable fix summary",
   "verification": "short verification summary",
   "rollback": "rollback guidance. For ownership/permission changes, include a pre-change backup command such as stat/ls -ln first, or state that reliable rollback requires the recorded original UID/GID/mode.",
@@ -589,6 +591,16 @@ The script MUST include:
 - Usage information
 - A dry-run mode when the script changes system state
 - Clear safety checks before destructive or privileged operations
+
+ROLLBACK REVERSIBILITY RULES:
+- FULLY_REVERSIBLE:
+  read-only checks, service restarts, temporary runtime changes that can be safely undone immediately.
+- PARTIALLY_REVERSIBLE:
+  container recreation, package installs, partial config edits, runtime state changes with side effects.
+- NON_REVERSIBLE_WITHOUT_BACKUP:
+  ownership changes, destructive commands, database migrations, wallet/channel operations, deletes, irreversible security changes, data modifications without snapshot/backup.
+- Never claim FULLY_REVERSIBLE when data, permissions, containers, wallets, channels, or persistent state may change.
+- If original state is unknown or not recorded, downgrade reversibility confidence.
 
 Respond STRICTLY with this JSON format:
 {

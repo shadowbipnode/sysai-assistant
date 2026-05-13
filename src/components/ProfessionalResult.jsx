@@ -260,6 +260,8 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
   const fix = commandText(first(result.fix_commands, result.commands, result.fix, result.remediation));
   const verification = commandText(first(result.verification_commands, result.verification, result.verify, result.validation_commands, result.check_command));
   const rollback = commandText(first(result.rollback_commands, result.rollback));
+  const rollbackReversibility = first(result.rollback_reversibility, result.rollback_safety, result.reversibility);
+  const rollbackRiskReason = first(result.rollback_risk_reason, result.rollback_risk, result.reversibility_reason);
   const safetyNotes = first(result.safety_notes, result.warning, result.security_notes, result.compliance_notes, result.risks);
   const prevention = first(result.prevention, result.improvements);
   const assumptions = asArray(result.assumptions);
@@ -410,6 +412,15 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
       {verification && (
         <ResultSection collapseSignal={collapseSignal} title="VERIFY" accent="#38BDF8" copyText={verification}>
           <CodeBlock text={verification} />
+        </ResultSection>
+      )}
+
+      {(rollbackReversibility || rollbackRiskReason) && (
+        <ResultSection collapseSignal={collapseSignal} title="ROLLBACK SAFETY" accent="#FBBF24">
+          {textSection([
+            rollbackReversibility ? `Reversibility: ${rollbackReversibility}` : null,
+            rollbackRiskReason ? `Reason: ${rollbackRiskReason}` : null,
+          ].filter(Boolean).join("\n"))}
         </ResultSection>
       )}
 
