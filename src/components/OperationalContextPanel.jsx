@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+
 import {
   loadOperationalContext,
   saveOperationalContext,
@@ -103,7 +104,7 @@ export default function OperationalContextPanel() {
         }
       />
 
-      <label>Operational Notes</label>
+<label>Operational Notes</label>
       <textarea
         style={{
           ...inputStyle,
@@ -118,6 +119,53 @@ export default function OperationalContextPanel() {
           })
         }
       />
+
+      {context.memory && (
+        <div style={{ marginTop: 22, marginBottom: 18 }}>
+          <h3 style={{ fontSize: 16, marginBottom: 12 }}>
+            Operational Memory
+          </h3>
+
+          {Object.entries(context.memory).map(([key, values]) => {
+            if (!Array.isArray(values) || values.length === 0) return null;
+
+            return (
+              <div key={key} style={{ marginBottom: 14 }}>
+                <div
+                  style={{
+                    color: "#8B95A8",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    marginBottom: 6,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {key.replaceAll("_", " ")}
+                </div>
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {values.map((value, index) => (
+                    <span
+                      key={`${key}-${index}`}
+                      style={{
+                        display: "inline-block",
+                        padding: "5px 9px",
+                        borderRadius: 999,
+                        background: "#1A1F2E",
+                        border: "1px solid #1E2535",
+                        color: "#B8C0D0",
+                        fontSize: 12,
+                      }}
+                    >
+                      {value}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
         <button

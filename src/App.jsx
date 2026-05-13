@@ -22,7 +22,7 @@ import History from './components/History';
 import CommandPalette from "./components/CommandPalette";
 import QuickModelSwitcher from "./components/QuickModelSwitcher";
 import OperationalContextPanel from "./components/OperationalContextPanel";
-
+import { updateOperationalMemory } from "./utils/operationalContextStore";
 
 function App() {
   const [lang, setLang] = useState("en");
@@ -189,7 +189,7 @@ function App() {
         return null;
       }
     };
-
+   
     let parsed = tryParse(candidate);
     if (parsed) return parsed;
 
@@ -206,7 +206,50 @@ function App() {
 
     return null;
   };
+  const learnFromOperationalResult = (result, incidentLabel = "") => {
+    if (!result || typeof result !== "object") return;
 
+    const text = JSON.stringify(result);
+
+    const known_ports = [...text.matchAll(/(?:127\.0\.0\.1|localhost|0\.0\.0\.0|[a-zA-Z0-9.-]+):(\d{2,5})/g)]
+      .map((match) => match[1]);
+
+    const known_paths = [...text.matchAll(/(?:\/[a-zA-Z0-9._-]+)+(?:\/)?/g)]
+      .map((match) => match[0])
+      .filter((path) => path.length > 1 && !path.includes("//"));
+
+    const known_domains = [...text.matchAll(/\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b/g)]
+      .map((match) => match[0])
+      .filter((domain) => !domain.includes("localhost"));
+
+    const known_containers = [...text.matchAll(/\b[a-zA-Z0-9][a-zA-Z0-9_.-]*-(?:app|web|api|db|nginx|redis|postgres|mysql|tor|lnd|bitcoin|core)-?\d*\b/g)]
+      .map((match) => match[0]);
+
+    const inferred_stack = Array.isArray(result.detected_stack)
+      ? result.detected_stack
+      : [];
+
+    const known_incidents = [
+      result.title,
+      result.root_cause,
+      result.summary,
+      incidentLabel,
+    ]
+      .filter(Boolean)
+      .map((item) => String(item).slice(0, 180));
+
+    updateOperationalMemory({
+      known_ports,
+      known_paths,
+      known_domains,
+      known_containers,
+      inferred_stack,
+      known_incidents,
+    });
+  };
+
+  // ============================================================
+  // HANDLERS CON HISTORY
   // ============================================================
   // HANDLERS CON HISTORY
   // ============================================================
@@ -245,7 +288,7 @@ function App() {
               : ""
           ),
         };
-
+        learnFromOperationalResult(normalizedResult, "Log Analyzer incident");
         showToast("Analisi completata!", "success");
 
         history.addEntry({
@@ -283,6 +326,7 @@ function App() {
       
       const result = extractJsonObject(response);
       if (result) {
+        learnFromOperationalResult(result, "Troubleshooter incident");
         showToast("Comando generato!", "success");
         history.addEntry({
           tool: 'commandCrafter',
