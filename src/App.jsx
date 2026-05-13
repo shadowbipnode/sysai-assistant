@@ -214,13 +214,22 @@ function App() {
     const known_ports = [...text.matchAll(/(?:127\.0\.0\.1|localhost|0\.0\.0\.0|[a-zA-Z0-9.-]+):(\d{2,5})/g)]
       .map((match) => match[1]);
 
-    const known_paths = [...text.matchAll(/(?:\/[a-zA-Z0-9._-]+)+(?:\/)?/g)]
+      const known_paths = [...text.matchAll(/(?:\/[a-zA-Z0-9._-]+)+(?:\/)?/g)]
       .map((match) => match[0])
-      .filter((path) => path.length > 1 && !path.includes("//"));
-
+      .filter((path) =>
+        path.length > 1 &&
+        !path.includes("//") &&
+        !/^\/?\d{1,3}(?:\.\d{1,3}){3}/.test(path)
+      );
+    
     const known_domains = [...text.matchAll(/\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b/g)]
       .map((match) => match[0])
-      .filter((domain) => !domain.includes("localhost"));
+      .filter((domain) =>
+        !domain.includes("localhost") &&
+        !domain.endsWith(".yml") &&
+        !domain.endsWith(".yaml") &&
+        !domain.startsWith("State.")
+      );
 
     const known_containers = [...text.matchAll(/\b[a-zA-Z0-9][a-zA-Z0-9_.-]*-(?:app|web|api|db|nginx|redis|postgres|mysql|tor|lnd|bitcoin|core)-?\d*\b/g)]
       .map((match) => match[0]);

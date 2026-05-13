@@ -33,6 +33,17 @@ export const defaultOperationalContext = {
     inferred_stack: [],
   },
 
+  baseline: {
+    known_services: [],
+    known_containers: [],
+    known_ports: [],
+    known_paths: [],
+    known_domains: [],
+    inferred_stack: [],
+    created_at: null,
+    updated_at: null,
+  },
+
   notes: "",
 };
 
@@ -98,6 +109,10 @@ export function normalizeOperationalContext(context) {
       ...defaultOperationalContext.memory,
       ...(context?.memory || {}),
     },
+    baseline: {
+      ...defaultOperationalContext.baseline,
+      ...(context?.baseline || {}),
+    },
   };
 
   return {
@@ -116,8 +131,28 @@ export function normalizeOperationalContext(context) {
       known_incidents: uniqueList(merged.memory.known_incidents, 20),
       inferred_stack: uniqueList(merged.memory.inferred_stack, 20),
     },
+    memory: {
+      known_services: uniqueList(merged.memory.known_services, 30),
+      known_containers: uniqueList(merged.memory.known_containers, 30),
+      known_ports: uniqueList(merged.memory.known_ports, 30),
+      known_paths: uniqueList(merged.memory.known_paths, 30),
+      known_domains: uniqueList(merged.memory.known_domains, 30),
+      known_incidents: uniqueList(merged.memory.known_incidents, 20),
+      inferred_stack: uniqueList(merged.memory.inferred_stack, 20),
+    },
+    baseline: {
+      known_services: uniqueList(merged.baseline.known_services, 30),
+      known_containers: uniqueList(merged.baseline.known_containers, 30),
+      known_ports: uniqueList(merged.baseline.known_ports, 30),
+      known_paths: uniqueList(merged.baseline.known_paths, 30),
+      known_domains: uniqueList(merged.baseline.known_domains, 30),
+      inferred_stack: uniqueList(merged.baseline.inferred_stack, 20),
+      created_at: merged.baseline.created_at || null,
+      updated_at: merged.baseline.updated_at || null,
+    },
   };
-}
+  };
+
 
 export function updateOperationalMemory(patch = {}) {
   const current = normalizeOperationalContext(loadOperationalContext());
@@ -155,11 +190,80 @@ export function updateOperationalMemory(patch = {}) {
         ...(patch.inferred_stack || []),
       ],
     },
+    
   });
 
   saveOperationalContext(next);
 
   return next;
+}
+export function saveOperationalBaseline() {
+  const current = normalizeOperationalContext(loadOperationalContext());
+  const now = new Date().toISOString();
+
+  const baseline = {
+    known_services: current.memory.known_services,
+    known_containers: current.memory.known_containers,
+    known_ports: current.memory.known_ports,
+    known_paths: current.memory.known_paths,
+    known_domains: current.memory.known_domains,
+    inferred_stack: current.memory.inferred_stack,
+    created_at: current.baseline.created_at || now,
+    updated_at: now,
+  };
+
+  const next = normalizeOperationalContext({
+    ...current,
+    baseline,
+  });
+
+  saveOperationalContext(next);
+
+  return next;
+}
+
+function diffList(baselineValues = [], currentValues = []) {
+  const baselineSet = new Set(baselineValues);
+  const currentSet = new Set(currentValues);
+
+  return {
+    added: currentValues.filter((item) => !baselineSet.has(item)),
+    missing: baselineValues.filter((item) => !currentSet.has(item)),
+  };
+}
+
+export function detectOperationalDrift(context = loadOperationalContext()) {
+  const normalized = normalizeOperationalContext(context);
+  const baseline = normalized.baseline || {};
+  const memory = normalized.memory || {};
+
+  const fields = [
+    "known_services",
+    "known_containers",
+    "known_ports",
+    "known_paths",
+    "known_domains",
+    "inferred_stack",
+  ];
+
+  const changes = fields
+    .map((field) => {
+      const diff = diffList(baseline[field] || [], memory[field] || []);
+
+      return {
+        field,
+        added: diff.added,
+        missing: diff.missing,
+      };
+    })
+    .filter((change) => change.added.length > 0 || change.missing.length > 0);
+
+  return {
+    drift_detected: changes.length > 0,
+    baseline_exists: Boolean(baseline.updated_at),
+    baseline_updated_at: baseline.updated_at || null,
+    changes,
+  };
 }
 export function resetOperationalContext() {
   localStorage.removeItem(STORAGE_KEY);
