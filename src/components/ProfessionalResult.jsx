@@ -266,10 +266,13 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
   const prevention = first(result.prevention, result.improvements);
   const assumptions = asArray(result.assumptions);
   const evidence = asArray(result.evidence);
+  const reasoningSummary = first(result.reasoning_summary, result.reasoning, result.operational_reasoning);
+  const decisionFactors = asArray(result.decision_factors);
+  const whyFirstAction = first(result.why_first_action, result.why_this_action);
+  const hasReasoningTransparency = reasoningSummary || decisionFactors.length > 0 || whyFirstAction;
   const findings = asArray(result.findings);
   const followUps = asArray(result.additional_logs_needed || result.follow_up_checks || result.follow_up_question);
-
-  const hasProfessionalFields = normalizedSeverity || confidence || requiresSudo !== undefined || nextBestAction || summary || rootCause || report || fix || verification || rollback || evidence.length || findings.length || assumptions.length || followUps.length || safetyNotes || prevention || recommendations || hardeningCommands;
+  const hasProfessionalFields = normalizedSeverity || confidence || requiresSudo !== undefined || nextBestAction || summary || rootCause || report || fix || verification || rollback || evidence.length || findings.length || assumptions.length || hasReasoningTransparency || followUps.length || safetyNotes || prevention || recommendations || hardeningCommands;
   if (!hasProfessionalFields) return null;
 
   return (
@@ -384,7 +387,29 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
           <ResultList items={evidence} />
         </ResultSection>
       )}
+      {hasReasoningTransparency && (
+  <ResultSection collapseSignal={collapseSignal} title="OPERATIONAL REASONING" accent="#A78BFA">
+    {reasoningSummary && textSection(reasoningSummary)}
 
+    {decisionFactors.length > 0 && (
+      <div style={{ marginTop: reasoningSummary ? 12 : 0 }}>
+        <div style={{ color: "#8B95A8", fontSize: 12, fontWeight: 800, marginBottom: 8 }}>
+          Decision factors
+        </div>
+        <ResultList items={decisionFactors} />
+      </div>
+    )}
+
+    {whyFirstAction && (
+      <div style={{ marginTop: 12 }}>
+        <div style={{ color: "#8B95A8", fontSize: 12, fontWeight: 800, marginBottom: 8 }}>
+          Why this first
+        </div>
+        {textSection(whyFirstAction)}
+      </div>
+    )}
+  </ResultSection>
+)}
       {findings.length > 0 && (
         <ResultSection collapseSignal={collapseSignal} title="FINDINGS" accent="#FF4D6A">
           <ResultList items={findings} />

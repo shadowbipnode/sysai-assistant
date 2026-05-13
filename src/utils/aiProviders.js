@@ -149,8 +149,12 @@ PROFESSIONAL OUTPUT RULES FOR ${toolName}:
 - Always include confidence: LOW, MEDIUM, or HIGH.
 - Always include next_best_action: the single safest first action.
 - Always separate evidence from assumptions.
+- Always include operational reasoning transparency fields: reasoning_summary, decision_factors, why_first_action.
+- Do NOT reveal hidden chain-of-thought. Provide concise operational justification only.
+- Reasoning transparency must explain observed signals, assumptions, prioritization, and verification logic.
 - Always include verification commands when commands or changes are suggested.
 - Always include rollback guidance. If no rollback is needed, say exactly: "No rollback needed for read-only checks."
+- rollback_reversibility must use ONLY: FULLY_REVERSIBLE, PARTIALLY_REVERSIBLE, NON_REVERSIBLE_WITHOUT_BACKUP. Do not invent extended enum values.
 - Use arrays for command blocks: fix_commands, verification_commands, rollback_commands. Each array item must be one complete shell command or one comment line starting with #.
 - Do not compress numbered steps into one long paragraph. Keep commands line-by-line.
 - next_best_action must be a single short action or a single command, not a chain of commands.
@@ -357,6 +361,9 @@ Use this exact JSON schema:
   "next_best_action": "The single safest first action to take, preferably a command or short action",
   "evidence": ["specific log line or fact", "specific log line or fact"],
   "assumptions": ["assumption made because the log does not show X"],
+  "reasoning_summary": "Concise operational justification based on evidence and assumptions. Do not reveal hidden chain-of-thought.",
+  "decision_factors": ["observed signal or operational factor that influenced the recommendation"],
+  "why_first_action": "Why the next_best_action is the safest first step.",
   "fix_commands": ["# Step 1 - read-only discovery", "command 1", "# Step 2 - safe remediation", "command 2"],
   "verification_commands": ["# Verify the service/result", "command"],
   "rollback_commands": ["No rollback needed for read-only checks."],
@@ -401,6 +408,9 @@ Respond STRICTLY with this JSON format:
   "next_best_action": "the first safest action to take",
   "evidence": ["facts from the request that influenced the command"],
   "assumptions": ["assumptions made because details were missing"],
+  "reasoning_summary": "Concise operational justification based on evidence and assumptions. Do not reveal hidden chain-of-thought.",
+  "decision_factors": ["observed signal or operational factor that influenced the recommendation"],
+  "why_first_action": "Why the next_best_action is the safest first step.",
   "verification_commands": ["command(s) to verify the result"],
   "rollback_commands": ["rollback command(s) or No rollback needed for read-only checks."],
   "verification": "short verification summary",
@@ -440,6 +450,9 @@ Response MUST be in this EXACT JSON format:
   "destructive": false,
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy"],
   "next_best_action": "safe first action before running it, or 'Review the explanation before execution'",
+  "reasoning_summary": "Concise operational justification based on evidence, risk, and operational impact. Do not reveal hidden chain-of-thought.",
+  "decision_factors": ["risk signal or operational factor that influenced the assessment"],
+  "why_first_action": "Why the next_best_action is the safest first step.",
   "lines": [{"line": "exact line", "explanation": "what it does"}],
   "risks": "risks or null",
   "improvements": "safer improvements or null",
@@ -486,6 +499,9 @@ Respond STRICTLY with this JSON format:
   "requires_sudo": true,
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
   "next_best_action": "first safe action before deployment",
+  "reasoning_summary": "Concise operational justification based on requirements, security impact, and deployment risk. Do not reveal hidden chain-of-thought.",
+  "decision_factors": ["configuration requirement or operational factor that influenced the recommendation"],
+  "why_first_action": "Why the next_best_action is the safest first step.",
   "verification_commands": ["commands to validate/test the config"],
   "rollback_commands": ["commands or steps to restore the previous config"],
   "verification": "short validation summary",
@@ -539,8 +555,11 @@ Respond STRICTLY with this JSON format:
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
   "next_best_action": "the single safest first command/action",
   "root_cause": "likely root cause and why",
-  "evidence": ["specific facts from the problem"],
+  evidence": ["specific facts from the problem"],
   "assumptions": ["assumptions made because details are missing"],
+  "reasoning_summary": "Concise operational justification based on evidence and assumptions. Do not reveal hidden chain-of-thought.",
+  "decision_factors": ["observed signal or operational factor that influenced the recommendation"],
+  "why_first_action": "Why the next_best_action/check_command is the safest first step.",
   "check_command": "first command to verify the diagnosis",
   "expected_output": "what the output should look like if this diagnosis is correct",
   "fix_commands": ["# Step 1 - read-only discovery", "command 1", "# Step 2 - safe remediation", "command 2"],
@@ -614,6 +633,9 @@ Respond STRICTLY with this JSON format:
   "destructive": false,
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
   "next_best_action": "first safe step before running the script",
+  "reasoning_summary": "Concise operational justification based on script behavior, safety checks, and operational risk. Do not reveal hidden chain-of-thought.",
+  "decision_factors": ["script behavior or operational factor that influenced the recommendation"],
+  "why_first_action": "Why the next_best_action is the safest first step.",
   "verification_commands": ["commands to verify script result"],
   "rollback_commands": ["rollback commands or No rollback needed for read-only checks."],
   "verification": "short verification summary",

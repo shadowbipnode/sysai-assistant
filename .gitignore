@@ -49,3 +49,6 @@ audit.sh
 dev.sh
 src.zip
 start.sh
+
+# Private AI handover docs
+/private-docs/
