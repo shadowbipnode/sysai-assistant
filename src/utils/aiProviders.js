@@ -151,6 +151,10 @@ PROFESSIONAL OUTPUT RULES FOR ${toolName}:
 - Always separate evidence from assumptions.
 - Always include operational reasoning transparency fields: reasoning_summary, decision_factors, why_first_action.
 - Do NOT reveal hidden chain-of-thought. Provide concise operational justification only.
+- Always include context awareness fields: context_used, context_signals, context_risk_notes.
+- context_used must be true only when operational memory or detected environment materially influenced the recommendation.
+- context_signals must list the specific memory/environment signals used.
+- context_risk_notes must explain limitations, stale-memory risk, or why current input overrides memory.
 - Reasoning transparency must explain observed signals, assumptions, prioritization, and verification logic.
 - Always include verification commands when commands or changes are suggested.
 - Always include verification trust semantics fields: verification_strength, verification_reason, verification_limitations.
@@ -371,6 +375,9 @@ Use this exact JSON schema:
   "reasoning_summary": "Concise operational justification based on evidence and assumptions. Do not reveal hidden chain-of-thought.",
   "decision_factors": ["observed signal or operational factor that influenced the recommendation"],
   "why_first_action": "Why the next_best_action is the safest first step.",
+  "context_used": true,
+  "context_signals": ["specific operational memory or detected environment signal used"],
+  "context_risk_notes": ["limitations or stale-memory risk; current input overrides memory"],
   "fix_commands": ["# Step 1 - read-only discovery", "command 1", "# Step 2 - safe remediation", "command 2"],
   "verification_commands": ["# Verify the service/result", "command"],
   "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
@@ -421,6 +428,9 @@ Respond STRICTLY with this JSON format:
   "reasoning_summary": "Concise operational justification based on evidence and assumptions. Do not reveal hidden chain-of-thought.",
   "decision_factors": ["observed signal or operational factor that influenced the recommendation"],
   "why_first_action": "Why the next_best_action is the safest first step.",
+  "context_used": true,
+  "context_signals": ["specific operational memory or detected environment signal used"],
+  "context_risk_notes": ["limitations or stale-memory risk; current input overrides memory"],
   "verification_commands": ["command(s) to verify the result"],
   "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
   "verification_reason": "Why the verification is strong, weak, or ambiguous.",
@@ -466,6 +476,9 @@ Response MUST be in this EXACT JSON format:
   "reasoning_summary": "Concise operational justification based on evidence, risk, and operational impact. Do not reveal hidden chain-of-thought.",
   "decision_factors": ["risk signal or operational factor that influenced the assessment"],
   "why_first_action": "Why the next_best_action is the safest first step.",
+  "context_used": true,
+  "context_signals": ["specific operational memory or detected environment signal used"],
+  "context_risk_notes": ["limitations or stale-memory risk; current input overrides memory"],
   "lines": [{"line": "exact line", "explanation": "what it does"}],
   "risks": "risks or null",
   "improvements": "safer improvements or null",
@@ -518,6 +531,9 @@ Respond STRICTLY with this JSON format:
   "reasoning_summary": "Concise operational justification based on requirements, security impact, and deployment risk. Do not reveal hidden chain-of-thought.",
   "decision_factors": ["configuration requirement or operational factor that influenced the recommendation"],
   "why_first_action": "Why the next_best_action is the safest first step.",
+  "context_used": true,
+  "context_signals": ["specific operational memory or detected environment signal used"],
+  "context_risk_notes": ["limitations or stale-memory risk; current input overrides memory"],
   "verification_commands": ["commands to validate/test the config"],
   "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
   "verification_reason": "Why the verification is strong, weak, or ambiguous.",
@@ -579,6 +595,9 @@ Respond STRICTLY with this JSON format:
   "reasoning_summary": "Concise operational justification based on evidence and assumptions. Do not reveal hidden chain-of-thought.",
   "decision_factors": ["observed signal or operational factor that influenced the recommendation"],
   "why_first_action": "Why the next_best_action/check_command is the safest first step.",
+  "context_used": true,
+  "context_signals": ["specific operational memory or detected environment signal used"],
+  "context_risk_notes": ["limitations or stale-memory risk; current input overrides memory"],
   "check_command": "first command to verify the diagnosis",
   "expected_output": "what the output should look like if this diagnosis is correct",
   "fix_commands": ["# Step 1 - read-only discovery", "command 1", "# Step 2 - safe remediation", "command 2"],
@@ -658,6 +677,9 @@ Respond STRICTLY with this JSON format:
   "reasoning_summary": "Concise operational justification based on script behavior, safety checks, and operational risk. Do not reveal hidden chain-of-thought.",
   "decision_factors": ["script behavior or operational factor that influenced the recommendation"],
   "why_first_action": "Why the next_best_action is the safest first step.",
+  "context_used": true,
+  "context_signals": ["specific operational memory or detected environment signal used"],
+  "context_risk_notes": ["limitations or stale-memory risk; current input overrides memory"],
   "verification_commands": ["commands to verify script result"],
   "verification_strength": "STRONG_VERIFICATION|WEAK_VERIFICATION|AMBIGUOUS_VERIFICATION",
   "verification_reason": "Why the verification is strong, weak, or ambiguous.",

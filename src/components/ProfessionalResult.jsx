@@ -273,9 +273,16 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
   const decisionFactors = asArray(result.decision_factors);
   const whyFirstAction = first(result.why_first_action, result.why_this_action);
   const hasReasoningTransparency = reasoningSummary || decisionFactors.length > 0 || whyFirstAction;
+  const contextUsed = Boolean(result.context_used);
+  const contextSignals = asArray(result.context_signals);
+  const contextRiskNotes = asArray(result.context_risk_notes);
+  const hasContextAwareness =
+    contextUsed ||
+    contextSignals.length > 0 ||
+    contextRiskNotes.length > 0;
   const findings = asArray(result.findings);
   const followUps = asArray(result.additional_logs_needed || result.follow_up_checks || result.follow_up_question);
-  const hasProfessionalFields = normalizedSeverity || confidence || requiresSudo !== undefined || nextBestAction || summary || rootCause || report || fix || verification || rollback || evidence.length || findings.length || assumptions.length || hasReasoningTransparency || followUps.length || safetyNotes || prevention || recommendations || hardeningCommands || verificationStrength || verificationReason || verificationLimitations.length;
+  const hasProfessionalFields = normalizedSeverity || confidence || requiresSudo !== undefined || nextBestAction || summary || rootCause || report || fix || verification || rollback || evidence.length || findings.length || assumptions.length || hasReasoningTransparency || followUps.length || safetyNotes || prevention || recommendations || hardeningCommands || verificationStrength || verificationReason || hasContextAwareness || hasContextAwareness || verificationLimitations.length ;
   if (!hasProfessionalFields) return null;
 
   return (
@@ -393,6 +400,30 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
       {hasReasoningTransparency && (
   <ResultSection collapseSignal={collapseSignal} title="OPERATIONAL REASONING" accent="#A78BFA">
     {reasoningSummary && textSection(reasoningSummary)}
+
+    {hasContextAwareness && (
+  <ResultSection collapseSignal={collapseSignal} title="CONTEXT AWARENESS" accent="#22C55E">
+    {textSection(contextUsed ? "Context used: YES" : "Context used: NO")}
+
+    {contextSignals.length > 0 && (
+      <div style={{ marginTop: 12 }}>
+        <div style={{ color: "#8B95A8", fontSize: 12, fontWeight: 800, marginBottom: 8 }}>
+          Context signals
+        </div>
+        <ResultList items={contextSignals} />
+      </div>
+    )}
+
+    {contextRiskNotes.length > 0 && (
+      <div style={{ marginTop: 12 }}>
+        <div style={{ color: "#8B95A8", fontSize: 12, fontWeight: 800, marginBottom: 8 }}>
+          Context risk notes
+        </div>
+        <ResultList items={contextRiskNotes} />
+      </div>
+    )}
+  </ResultSection>
+)}
 
     {decisionFactors.length > 0 && (
       <div style={{ marginTop: reasoningSummary ? 12 : 0 }}>
