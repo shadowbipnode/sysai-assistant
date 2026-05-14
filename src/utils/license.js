@@ -11,7 +11,7 @@
 // COSTANTI
 // ============================================================
 import { getDeviceId } from './deviceIdentity';
-
+import { activateOnlineLicense } from './licenseServer';
 const LICENSE_STORAGE_KEY = 'sysai_license';
 const LICENSE_PREFIX = 'SYSAI-';
 
@@ -272,14 +272,40 @@ export function hasFeature(featureName) {
 export async function activateLicense(key) {
   const result = await validateLicense(key);
 
-  if (result.valid) {
-    saveLicense(key);
-    await refreshLicenseCache();
+  if (!result.valid) {
+    return result;
   }
 
-  return result;
-}
+  const deviceId = await getDeviceId();
 
+  if (result.activationRequired) {
+    const onlineActivation = await activateOnlineLicense({
+      license_id: result.id,
+      device_id: deviceId,
+      app_version: '1.5.0',
+      platform: window.electron?.platform || navigator.platform || 'unknown',
+    });
+
+    if (!onlineActivation.ok) {
+      return {
+        valid: false,
+        isPro: false,
+        type: 'free',
+        error: onlineActivation.error || 'Online activation failed',
+        activation_failed: true,
+      };
+    }
+  }
+
+  saveLicense(key);
+  await refreshLicenseCache();
+
+  return {
+    ...result,
+    deviceId,
+    activated: true,
+  };
+}
 export async function deactivateLicense() {
   removeLicense();
   _cachedStatus = { valid: false, type: 'free', isPro: false };

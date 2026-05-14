@@ -1,10 +1,15 @@
 const LICENSE_SERVER_URL_KEY = 'sysai_license_server_url';
 
+const DEFAULT_LICENSE_SERVER_URL = 'https://lic.shadowbip.com';
+
 export function getLicenseServerUrl() {
   try {
-    return localStorage.getItem(LICENSE_SERVER_URL_KEY) || null;
+    return (
+      localStorage.getItem(LICENSE_SERVER_URL_KEY) ||
+      DEFAULT_LICENSE_SERVER_URL
+    );
   } catch {
-    return null;
+    return DEFAULT_LICENSE_SERVER_URL;
   }
 }
 
@@ -21,7 +26,6 @@ export function setLicenseServerUrl(url) {
     return false;
   }
 }
-
 async function postLicenseServer(path, payload) {
   const baseUrl = getLicenseServerUrl();
 

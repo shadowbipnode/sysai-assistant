@@ -8,10 +8,23 @@ function generateDeviceId() {
   return `sysai_${randomSegment()}${randomSegment()}`;
 }
 
+function unwrapSecureStoreValue(result) {
+  if (!result) return null;
+
+  if (typeof result === 'string') return result;
+
+  if (typeof result === 'object' && result.success && typeof result.value === 'string') {
+    return result.value;
+  }
+
+  return null;
+}
+
 export async function getDeviceId() {
   try {
     if (window.electron?.secureStore?.get) {
-      let existing = await window.electron.secureStore.get(DEVICE_ID_KEY);
+      const existingResult = await window.electron.secureStore.get(DEVICE_ID_KEY);
+      const existing = unwrapSecureStoreValue(existingResult);
 
       if (existing) return existing;
 
@@ -25,7 +38,6 @@ export async function getDeviceId() {
       return created;
     }
 
-    // fallback browser/dev mode
     let existing = localStorage.getItem(DEVICE_ID_KEY);
 
     if (existing) return existing;
@@ -38,6 +50,12 @@ export async function getDeviceId() {
   } catch (err) {
     console.error('[DeviceIdentity]', err);
 
-    return generateDeviceId();
+    const fallback = generateDeviceId();
+
+    try {
+      localStorage.setItem(DEVICE_ID_KEY, fallback);
+    } catch {}
+
+    return fallback;
   }
 }
