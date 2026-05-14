@@ -20,7 +20,7 @@
     "electron:build:rpm": "vite build && electron-builder --linux rpm --config electron-builder.json",
     "electron:build:appimage": "vite build && electron-builder --linux AppImage --config electron-builder.json",
     "electron:build:all": "vite build && electron-builder --linux deb rpm AppImage --config electron-builder.json",
-    "electron:build:win": "vite build && electron-builder --win nsis portable --x64 --config electron-builder.json",
+    "electron:build:win": "vite build && electron-builder --win nsis zip --x64 --config electron-builder.json",
     "electron:build:win:nsis": "vite build && electron-builder --win nsis --x64 --config electron-builder.json --publish never",
     "electron:build:win:portable": "vite build && electron-builder --win portable --x64 --config electron-builder.json",
     "electron:build:win:dir": "vite build && electron-builder --win dir --x64 --config electron-builder.json",

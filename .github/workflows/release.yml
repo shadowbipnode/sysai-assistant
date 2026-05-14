@@ -62,6 +62,7 @@ jobs:
           name: windows-builds
           path: |
             release/*.exe
+            release/*.zip
 
   publish-release:
     name: Publish GitHub Release
