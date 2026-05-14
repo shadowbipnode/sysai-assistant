@@ -1,0 +1,152 @@
+name: Build and Publish Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build Linux packages
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: npm run electron:build:all
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-builds
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.rpm
+
+  build-windows:
+    name: Build Windows packages
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: npm run electron:build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-builds
+          path: |
+            release/*.exe
+
+  publish-release:
+    name: Publish GitHub Release
+    needs:
+      - build-linux
+      - build-windows
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "SysAI Assistant ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          body: |
+            # SysAI Assistant ${{ github.ref_name }}
+
+            SysAI Assistant is an AI-powered operational toolkit for Linux sysadmins, infrastructure operators, and security-focused environments.
+
+            This release introduces the first complete Pro licensing architecture alongside major operational context improvements and infrastructure hardening.
+
+            ---
+
+            ## Highlights
+
+            ### New Pro Licensing Architecture
+            - Server-backed license activation
+            - Device-bound activations
+            - Activation limits enforcement
+            - Cryptographically signed licenses (Ed25519)
+            - Secure offline-aware entitlement validation
+            - Beta / Pro plan infrastructure
+
+            ### Operational Improvements
+            - Better AI troubleshooting context handling
+            - Improved system analysis consistency
+            - More reliable operational recommendations
+            - Reduced hallucinations in infra workflows
+            - Stronger baseline and drift awareness
+
+            ### Security
+            - Hardened licensing flow
+            - Secure device identity persistence
+            - Improved CSP configuration
+            - Better Electron isolation boundaries
+            - Safer IPC communication paths
+
+            ### Packaging
+            Automatic builds are now generated directly from GitHub Actions.
+
+            Included artifacts:
+            - Linux AppImage
+            - Linux DEB
+            - Linux RPM
+            - Windows NSIS installer
+            - Windows portable executable
+
+            ---
+
+            ## Notes
+
+            This is still a beta-stage release intended for testing and feedback.
+
+            The licensing backend infrastructure is intentionally not part of the public repository.
+
+            If you encounter issues, please open a GitHub issue including:
+            - operating system
+            - SysAI version
+            - logs/screenshots
+            - reproduction steps
+
+            ---
+
+            ## Project
+
+            GitHub:
+            https://github.com/shadowbipnode/sysai-assistant
+
+          files: |
+            artifacts/**/*
