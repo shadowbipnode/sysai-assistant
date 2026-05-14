@@ -25,7 +25,7 @@ jobs:
 
       - run: npm run build
 
-      - run: npm run electron:build:all
+      - run: npm run electron:build:all -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -53,7 +53,7 @@ jobs:
 
       - run: npm run build
 
-      - run: npm run electron:build:win
+      - run: npm run electron:build:win -- --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
