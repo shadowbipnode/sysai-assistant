@@ -85,7 +85,7 @@ jobs:
           draft: false
           prerelease: false
           body: |
-            # SysAI Assistant ${{ github.ref_name }}
+            
 
             SysAI Assistant is an AI-powered operational toolkit for Linux sysadmins, infrastructure operators, and security-focused environments.
 
