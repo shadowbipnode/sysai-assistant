@@ -37,6 +37,7 @@ function App() {
   const [systemProfile, setSystemProfile] = useState("");
   const [showProBanner, setShowProBanner] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [historyInitialQuery, setHistoryInitialQuery] = useState("");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
     // License state
@@ -941,7 +942,13 @@ function App() {
               <input
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                placeholder={t.searchPlaceholder}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && searchText.trim()) {
+                    setHistoryInitialQuery(searchText.trim());
+                    setPage("history");
+                  }
+                }}
+                placeholder={t.historySearchPlaceholder}
                 style={{
                   width: "100%", padding: "4px 0", borderRadius: 12,
                   background: "transparent", border: "none", outline: "none", color: text1,
@@ -1087,6 +1094,7 @@ function App() {
         {page === "history" && (
           <History
             entries={history.entries}
+            initialQuery={historyInitialQuery}
             onSearch={history.searchEntries}
             onToggleFavorite={history.toggleFavorite}
             onDelete={history.deleteEntry}

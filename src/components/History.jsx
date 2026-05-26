@@ -4,7 +4,7 @@
  * ═══════════════════════════════════════════════════════════
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 const TOOL_ICONS = {
   logAnalyzer: '📋',
@@ -89,12 +89,20 @@ export default function History({
   text1 = '#E8ECF4',
   text2 = '#8B95A8',
   showFavoritesOnly = false,
+  initialQuery = '',
 }) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialQuery || '');
   const [toolFilter, setToolFilter] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [copied, setCopied] = useState(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  useEffect(() => {
+    if (initialQuery) {
+      setSearchQuery(initialQuery);
+    }
+  }, [initialQuery]);
+
 
   // Filter entries
   const filteredEntries = useMemo(() => {

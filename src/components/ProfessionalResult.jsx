@@ -262,6 +262,19 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
   const verificationStrength = first(result.verification_strength, result.verification_trust, result.validation_strength);
   const verificationReason = first(result.verification_reason, result.verification_trust_reason, result.validation_reason);
   const verificationLimitations = asArray(result.verification_limitations);
+
+  const normalizedVerificationStrength =
+    typeof verificationStrength === "string"
+      ? verificationStrength.toUpperCase()
+      : verificationStrength;
+
+  const verificationColor =
+    normalizedVerificationStrength === "STRONG_VERIFICATION"
+      ? "#00D4AA"
+      : normalizedVerificationStrength === "WEAK_VERIFICATION"
+        ? "#FBBF24"
+        : "#FF4D6A";
+
   const rollback = commandText(first(result.rollback_commands, result.rollback));
   const rollbackReversibility = first(result.rollback_reversibility, result.rollback_safety, result.reversibility);
   const rollbackRiskReason = first(result.rollback_risk_reason, result.rollback_risk, result.reversibility_reason);
@@ -469,7 +482,23 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
       )}
       {(verificationStrength || verificationReason || verificationLimitations.length > 0) && (
   <ResultSection collapseSignal={collapseSignal} title="VERIFICATION TRUST" accent="#38BDF8">
-    {verificationStrength && textSection(`Strength: ${verificationStrength}`)}
+    {verificationStrength && (
+      <div
+        style={{
+          display: "inline-block",
+          padding: "6px 12px",
+          borderRadius: 999,
+          background: `${verificationColor}22`,
+          border: `1px solid ${verificationColor}`,
+          color: verificationColor,
+          fontSize: 12,
+          fontWeight: 800,
+          marginBottom: 10,
+        }}
+      >
+        {normalizedVerificationStrength}
+      </div>
+    )}
 
     {verificationReason && (
       <div style={{ marginTop: verificationStrength ? 12 : 0 }}>
@@ -524,7 +553,10 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
       )}
 
       {assumptions.length > 0 && (
-        <ResultSection collapseSignal={collapseSignal} title="ASSUMPTIONS" accent="#8B95A8">
+        <ResultSection collapseSignal={collapseSignal} title="ASSUMPTIONS / INFERRED CONTEXT" accent="#FBBF24">
+          <div style={{ color: "#B8C0D0", fontSize: 13, marginBottom: 10 }}>
+            These are inferred details, not verified facts. Use the verification steps before applying changes.
+          </div>
           <ResultList items={assumptions} />
         </ResultSection>
       )}
