@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { loadOperationalContext } from '../utils/operationalContextStore';
 
 const STORAGE_KEY = 'sysai_history';
 const MAX_ENTRIES = 500;
@@ -33,6 +34,29 @@ const MAX_ENTRIES = 500;
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+}
+
+function createContextSnapshot() {
+  try {
+    const context = loadOperationalContext();
+    const profile = context.profile || {};
+    const memory = context.memory || {};
+
+    return {
+      os: profile.os || '',
+      platform: profile.platform || '',
+      environmentType: profile.environment_type || '',
+      primaryUse: profile.primary_use || '',
+      stacks: Array.isArray(profile.stacks) ? profile.stacks.slice(0, 8) : [],
+      knownServices: Array.isArray(memory.known_services) ? memory.known_services.slice(0, 8) : [],
+      knownContainers: Array.isArray(memory.known_containers) ? memory.known_containers.slice(0, 8) : [],
+      inferredStack: Array.isArray(memory.inferred_stack) ? memory.inferred_stack.slice(0, 8) : [],
+      capturedAt: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.warn('[History] Could not capture operational context snapshot:', err.message);
+    return null;
+  }
 }
 
 function loadHistory() {
@@ -76,6 +100,7 @@ export function useHistory() {
       output,
       provider,
       model,
+      contextSnapshot: createContextSnapshot(),
       timestamp: Date.now(),
       favorite: false,
     };
@@ -106,7 +131,12 @@ export function useHistory() {
           : JSON.stringify(entry.output);
         const outputMatch = outputStr?.toLowerCase().includes(q);
         const toolMatch = entry.toolName?.toLowerCase().includes(q);
-        return inputMatch || outputMatch || toolMatch;
+        const contextStr = entry.contextSnapshot
+          ? JSON.stringify(entry.contextSnapshot)
+          : '';
+        const contextMatch = contextStr.toLowerCase().includes(q);
+
+        return inputMatch || outputMatch || toolMatch || contextMatch;
       }
 
       return true;

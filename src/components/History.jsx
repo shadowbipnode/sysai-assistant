@@ -111,7 +111,14 @@ export default function History({
         const outputStr = typeof e.output === 'string' ? e.output : JSON.stringify(e.output);
         const outputMatch = outputStr?.toLowerCase().includes(q);
         const toolMatch = e.toolName?.toLowerCase().includes(q);
-        return inputMatch || outputMatch || toolMatch;
+
+        const contextStr = e.contextSnapshot
+          ? JSON.stringify(e.contextSnapshot)
+          : '';
+
+        const contextMatch = contextStr.toLowerCase().includes(q);
+
+        return inputMatch || outputMatch || toolMatch || contextMatch;
       });
     }
 
