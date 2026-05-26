@@ -54,6 +54,8 @@ Instead of focusing on conversational interactions, SysAI is designed around ope
 
 The goal is making AI outputs feel operationally useful instead of conversational.
 
+SysAI focuses on operational trust, remediation safety and infrastructure-aware reasoning instead of generic AI conversation.
+
 ---
 
 # 🧠 What makes SysAI different?
@@ -102,12 +104,39 @@ Instead of returning giant AI-generated paragraphs, SysAI produces:
 * verification commands
 * rollback guidance
 * assumptions tracking
+* evidence vs assumptions separation
 * operational recommendations
 * confidence/risk analysis
+* remediation safety scoring
+* rollback trust semantics
+* evidence quality analysis
 
 The result is cleaner, safer and more production-oriented.
 
 ---
+
+# 🧠 Operational trust model
+
+SysAI distinguishes between:
+
+* verified evidence
+* inferred assumptions
+* remediation safety
+* rollback confidence
+* verification trust strength
+
+This helps reduce dangerous AI hallucinations during infrastructure troubleshooting.
+
+SysAI is designed to:
+
+* prefer read-only discovery first
+* avoid fabricated infrastructure assumptions
+* separate evidence from inference
+* explain verification limitations
+* expose rollback uncertainty explicitly
+
+---
+
 
 ## 🔒 Local-first architecture
 
@@ -152,6 +181,10 @@ Features:
 * verification workflows
 * rollback guidance
 * confidence/risk scoring
+* operational trust semantics
+* evidence vs assumptions analysis
+* remediation safety scoring
+* rollback confidence analysis
 
 ---
 
@@ -479,6 +512,11 @@ npm run electron:build:all
 * [x] lint workflow
 * [x] export to `.md`, `.sh`, `.py`, `.ps1`, `.js`
 * [x] command palette MVP
+* [x] operational trust semantics
+* [x] evidence vs assumptions separation
+* [x] remediation safety scoring
+* [x] rollback trust analysis
+* [x] context-linked operational history
 
 ## Planned
 
