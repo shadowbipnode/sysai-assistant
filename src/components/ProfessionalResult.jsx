@@ -275,6 +275,29 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
         ? "#FBBF24"
         : "#FF4D6A";
 
+  const remediationSafety = first(result.remediation_safety, result.action_safety);
+  const evidenceQuality = first(result.evidence_quality, result.evidence_strength);
+  const rollbackConfidence = first(result.rollback_confidence, result.rollback_trust);
+
+  const safetyColor = remediationSafety === "READ_ONLY_SAFE" || remediationSafety === "REVERSIBLE_SAFE"
+    ? "#00D4AA"
+    : remediationSafety === "PARTIAL_RISK"
+      ? "#FBBF24"
+      : "#FF4D6A";
+
+  const evidenceQualityColor = evidenceQuality === "DIRECT_EVIDENCE"
+    ? "#00D4AA"
+    : evidenceQuality === "PARTIAL_EVIDENCE"
+      ? "#FBBF24"
+      : "#FF4D6A";
+
+  const rollbackConfidenceColor =
+    rollbackConfidence === "ROLLBACK_NOT_REQUIRED" || rollbackConfidence === "VERIFIED_ROLLBACK"
+      ? "#00D4AA"
+      : rollbackConfidence === "PARTIAL_ROLLBACK"
+        ? "#FBBF24"
+        : "#FF4D6A";
+
   const rollback = commandText(first(result.rollback_commands, result.rollback));
   const rollbackReversibility = first(result.rollback_reversibility, result.rollback_safety, result.reversibility);
   const rollbackRiskReason = first(result.rollback_risk_reason, result.rollback_risk, result.reversibility_reason);
@@ -359,6 +382,9 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
       <div style={{ marginBottom: 12 }}>
         {normalizedSeverity && <ResultPill label="RISK" value={normalizedSeverity} color={severityColor} />}
         {confidence && <ResultPill label="CONFIDENCE" value={confidence} color={confidenceColor} />}
+        {remediationSafety && <ResultPill label="SAFETY" value={remediationSafety} color={safetyColor} />}
+        {evidenceQuality && <ResultPill label="EVIDENCE" value={evidenceQuality} color={evidenceQualityColor} />}
+        {rollbackConfidence && <ResultPill label="ROLLBACK TRUST" value={rollbackConfidence} color={rollbackConfidenceColor} />}
         {requiresSudo !== undefined && <ResultPill label="SUDO" value={requiresSudo ? "YES" : "NO"} color={requiresSudo ? "#FBBF24" : "#00D4AA"} />}
         {destructive !== undefined && <ResultPill label="DESTRUCTIVE" value={destructive === true ? "YES" : destructive === false ? "NO" : destructive} color={destructive ? "#FF4D6A" : "#00D4AA"} />}
         {isRemoteObservation && <ResultPill label="MODE" value="REMOTE OBSERVATION" color="#38BDF8" />}

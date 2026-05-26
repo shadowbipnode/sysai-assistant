@@ -171,6 +171,17 @@ PROFESSIONAL OUTPUT RULES FOR ${toolName}:
 - STRONG_VERIFICATION means the verification directly confirms the intended operational outcome.
 - WEAK_VERIFICATION means the verification is indirect, partial, or only confirms process/status.
 - AMBIGUOUS_VERIFICATION means the verification may pass while the real issue remains unresolved or needs interpretation.
+- Always include operational safety scoring fields: remediation_safety, evidence_quality, rollback_confidence.
+- remediation_safety must use ONLY: READ_ONLY_SAFE, REVERSIBLE_SAFE, PARTIAL_RISK, HIGH_RISK, DESTRUCTIVE.
+- evidence_quality must use ONLY: DIRECT_EVIDENCE, PARTIAL_EVIDENCE, ASSUMPTION_HEAVY.
+- rollback_confidence must use ONLY: ROLLBACK_NOT_REQUIRED, VERIFIED_ROLLBACK, PARTIAL_ROLLBACK, UNKNOWN_ROLLBACK.
+- remediation_safety measures how safe the proposed action is, not how likely the diagnosis is.
+- evidence_quality measures how directly the input supports the diagnosis.
+- rollback_confidence measures whether rollback is required, realistic, and validated.
+- Use ROLLBACK_NOT_REQUIRED when the recommended workflow is read-only or does not change system state.
+- VERIFIED_ROLLBACK must only be used when the previous state, configuration, image version, snapshot, backup, or reversible action is explicitly known or captured.
+- UNKNOWN_ROLLBACK must be used when state-changing remediation is suggested but no validated previous state, backup, or rollback target exists.
+- PARTIAL_ROLLBACK should be used when rollback is theoretically possible but incomplete, risky, or dependent on unknown prior state.
 - Always include rollback guidance. If no rollback is needed, say exactly: "No rollback needed for read-only checks."
 - rollback_reversibility must use ONLY: FULLY_REVERSIBLE, PARTIALLY_REVERSIBLE, NON_REVERSIBLE_WITHOUT_BACKUP. Do not invent extended enum values.
 - Use arrays for command blocks: fix_commands, verification_commands, rollback_commands. Each array item must be one complete shell command or one comment line starting with #.
@@ -376,6 +387,9 @@ Use this exact JSON schema:
 {
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
   "confidence": "LOW|MEDIUM|HIGH",
+  "remediation_safety": "READ_ONLY_SAFE|REVERSIBLE_SAFE|PARTIAL_RISK|HIGH_RISK|DESTRUCTIVE",
+  "evidence_quality": "DIRECT_EVIDENCE|PARTIAL_EVIDENCE|ASSUMPTION_HEAVY",
+  "rollback_confidence": "ROLLBACK_NOT_REQUIRED|VERIFIED_ROLLBACK|PARTIAL_ROLLBACK|UNKNOWN_ROLLBACK",
   "requires_sudo": true,
   "detected_stack": ["nginx", "docker", "systemd", "LND", "Bitcoin Core", "Tor"],
   "title": "Brief diagnostic title",
@@ -431,6 +445,9 @@ Respond STRICTLY with this JSON format:
   "explanation": "What the command does and why these flags/options are used",
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
   "confidence": "LOW|MEDIUM|HIGH",
+  "remediation_safety": "READ_ONLY_SAFE|REVERSIBLE_SAFE|PARTIAL_RISK|HIGH_RISK|DESTRUCTIVE",
+  "evidence_quality": "DIRECT_EVIDENCE|PARTIAL_EVIDENCE|ASSUMPTION_HEAVY",
+  "rollback_confidence": "ROLLBACK_NOT_REQUIRED|VERIFIED_ROLLBACK|PARTIAL_ROLLBACK|UNKNOWN_ROLLBACK",
   "requires_sudo": true,
   "destructive": false,
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy"],
@@ -481,6 +498,9 @@ Response MUST be in this EXACT JSON format:
   "summary": "one sentence summary",
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
   "confidence": "LOW|MEDIUM|HIGH",
+  "remediation_safety": "READ_ONLY_SAFE|REVERSIBLE_SAFE|PARTIAL_RISK|HIGH_RISK|DESTRUCTIVE",
+  "evidence_quality": "DIRECT_EVIDENCE|PARTIAL_EVIDENCE|ASSUMPTION_HEAVY",
+  "rollback_confidence": "ROLLBACK_NOT_REQUIRED|VERIFIED_ROLLBACK|PARTIAL_ROLLBACK|UNKNOWN_ROLLBACK",
   "requires_sudo": true,
   "destructive": false,
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy"],
@@ -537,6 +557,9 @@ Respond STRICTLY with this JSON format:
   "explanation": "brief explanation of key settings and why they were chosen",
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
   "confidence": "LOW|MEDIUM|HIGH",
+  "remediation_safety": "READ_ONLY_SAFE|REVERSIBLE_SAFE|PARTIAL_RISK|HIGH_RISK|DESTRUCTIVE",
+  "evidence_quality": "DIRECT_EVIDENCE|PARTIAL_EVIDENCE|ASSUMPTION_HEAVY",
+  "rollback_confidence": "ROLLBACK_NOT_REQUIRED|VERIFIED_ROLLBACK|PARTIAL_ROLLBACK|UNKNOWN_ROLLBACK",
   "requires_sudo": true,
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
   "next_best_action": "first safe action before deployment",
@@ -598,6 +621,9 @@ Respond STRICTLY with this JSON format:
   "diagnosis": "most likely cause based on the description",
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
   "confidence": "LOW|MEDIUM|HIGH",
+  "remediation_safety": "READ_ONLY_SAFE|REVERSIBLE_SAFE|PARTIAL_RISK|HIGH_RISK|DESTRUCTIVE",
+  "evidence_quality": "DIRECT_EVIDENCE|PARTIAL_EVIDENCE|ASSUMPTION_HEAVY",
+  "rollback_confidence": "ROLLBACK_NOT_REQUIRED|VERIFIED_ROLLBACK|PARTIAL_ROLLBACK|UNKNOWN_ROLLBACK",
   "requires_sudo": true,
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
   "next_best_action": "the single safest first command/action",
@@ -682,6 +708,9 @@ Respond STRICTLY with this JSON format:
   "dependencies": "required packages or tools, or null",
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
   "confidence": "LOW|MEDIUM|HIGH",
+  "remediation_safety": "READ_ONLY_SAFE|REVERSIBLE_SAFE|PARTIAL_RISK|HIGH_RISK|DESTRUCTIVE",
+  "evidence_quality": "DIRECT_EVIDENCE|PARTIAL_EVIDENCE|ASSUMPTION_HEAVY",
+  "rollback_confidence": "ROLLBACK_NOT_REQUIRED|VERIFIED_ROLLBACK|PARTIAL_ROLLBACK|UNKNOWN_ROLLBACK",
   "requires_sudo": true,
   "destructive": false,
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
@@ -740,6 +769,9 @@ Respond STRICTLY with this JSON format:
   "risk_level": "LOW|MEDIUM|HIGH|CRITICAL",
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
   "confidence": "LOW|MEDIUM|HIGH",
+  "remediation_safety": "READ_ONLY_SAFE|REVERSIBLE_SAFE|PARTIAL_RISK|HIGH_RISK|DESTRUCTIVE",
+  "evidence_quality": "DIRECT_EVIDENCE|PARTIAL_EVIDENCE|ASSUMPTION_HEAVY",
+  "rollback_confidence": "ROLLBACK_NOT_REQUIRED|VERIFIED_ROLLBACK|PARTIAL_ROLLBACK|UNKNOWN_ROLLBACK",
   "requires_sudo": true,
   "detected_stack": ["SSH", "nginx/reverse-proxy", "Docker/Compose", "Bitcoin Core", "LND/Lightning", "Tor"],
   "next_best_action": "the single safest first hardening action or validation command",
@@ -800,6 +832,9 @@ Respond STRICTLY with this JSON format:
   "risk_level": "LOW|MEDIUM|HIGH|CRITICAL",
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
   "confidence": "LOW|MEDIUM|HIGH",
+  "remediation_safety": "READ_ONLY_SAFE|REVERSIBLE_SAFE|PARTIAL_RISK|HIGH_RISK|DESTRUCTIVE",
+  "evidence_quality": "DIRECT_EVIDENCE|PARTIAL_EVIDENCE|ASSUMPTION_HEAVY",
+  "rollback_confidence": "ROLLBACK_NOT_REQUIRED|VERIFIED_ROLLBACK|PARTIAL_ROLLBACK|UNKNOWN_ROLLBACK",
   "requires_sudo": true,
   "detected_stack": ["SSH", "TLS", "nginx/reverse-proxy", "Docker/Compose"],
   "next_best_action": "the single safest first action",
