@@ -86,61 +86,53 @@ jobs:
           draft: false
           prerelease: false
           body: |
-            
 
-            SysAI Assistant is an AI-powered operational toolkit for Linux sysadmins, infrastructure operators, and security-focused environments.
-
-            This release introduces the first complete Pro licensing architecture alongside major operational context improvements and infrastructure hardening.
+            SysAI v1.6.0-beta significantly expands operational intelligence, trust-awareness and troubleshooting workflow capabilities.
 
             ---
 
             ## Highlights
 
-            ### New Pro Licensing Architecture
-            - Server-backed license activation
-            - Device-bound activations
-            - Activation limits enforcement
-            - Cryptographically signed licenses (Ed25519)
-            - Secure offline-aware entitlement validation
-            - Beta / Pro plan infrastructure
+            ### Operational Trust & Safety
+            - remediation safety scoring
+            - evidence quality analysis
+            - rollback trust semantics
+            - verification trust semantics
+            - assumptions vs verified evidence separation
+            - safer rollback logic
+            - improved anti-hallucination operational safeguards
 
-            ### Operational Improvements
-            - Better AI troubleshooting context handling
-            - Improved system analysis consistency
-            - More reliable operational recommendations
-            - Reduced hallucinations in infra workflows
-            - Stronger baseline and drift awareness
+            ### Operational Intelligence
+            - environment-aware diagnostics
+            - context-linked operational history
+            - improved workflow continuity foundations
+            - multilingual operational consistency improvements
+            - reasoning transparency enhancements
+            - safer infrastructure remediation logic
 
-            ### Security
-            - Hardened licensing flow
-            - Secure device identity persistence
-            - Improved CSP configuration
-            - Better Electron isolation boundaries
-            - Safer IPC communication paths
+            ### UX Improvements
+            - improved live history search
+            - homepage → history workflow integration
+            - refined operational result rendering
+            - clearer operational trust visualization
 
-            ### Packaging
-            Automatic builds are now generated directly from GitHub Actions.
-
-            Included artifacts:
-            - Linux AppImage
-            - Linux DEB
-            - Linux RPM
-            - Windows NSIS installer
-            - Windows portable executable
+            ### Included Features
+            - 7 operational AI tools
+            - Windows installer + portable builds
+            - Linux AppImage / DEB / RPM
+            - local-first architecture
+            - multi-provider support
+            - Ollama fully local/offline support
+            - integrated security scanners
+            - rollback-aware workflows
 
             ---
 
             ## Notes
 
-            This is still a beta-stage release intended for testing and feedback.
+            This is still a beta-stage release intended for testing and operational feedback.
 
-            The licensing backend infrastructure is intentionally not part of the public repository.
-
-            If you encounter issues, please open a GitHub issue including:
-            - operating system
-            - SysAI version
-            - logs/screenshots
-            - reproduction steps
+            Always review AI-generated commands and remediation steps before applying them to production infrastructure.
 
             ---
 
@@ -148,6 +140,10 @@ jobs:
 
             GitHub:
             https://github.com/shadowbipnode/sysai-assistant
+
+            Support development:
+            https://github.com/sponsors/shadowbipnode
+
 
           files: |
             artifacts/**/*
