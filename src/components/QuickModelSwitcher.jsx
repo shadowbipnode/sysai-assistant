@@ -110,7 +110,9 @@ const QuickModelSwitcher = ({
               color: "#E8ECF4",
             }}
           >
-            {(availableModels[defaultProvider] || []).map((model) => (
+            {Array.from(
+              new Map((availableModels[defaultProvider] || []).map((model) => [model.id, model])).values()
+            ).map((model) => (
               <option key={model.id} value={model.id}>
                 {model.name || model.id}
               </option>

@@ -176,8 +176,12 @@ const Settings = ({ t, lang, theme, accent, accentDim, surface, surface2, border
                         cursor: "pointer", minWidth: 220,
                       }}
                     >
-                      {models.map(m => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
+                      {Array.from(
+                        new Map(models.map(m => [m.id, m])).values()
+                      ).map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
                       ))}
                     </select>
                   )}
