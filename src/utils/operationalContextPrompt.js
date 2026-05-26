@@ -69,5 +69,9 @@ Rules:
 - Current user input and logs override memory.
 - Use memory to choose safer discovery commands and avoid generic placeholders when relevant.
 - If memory conflicts with current input, state the assumption explicitly.
+- If the current input is partial, messy, or incomplete, do not pretend certainty.
+- Clearly separate observed evidence from inferred assumptions.
+- Prefer targeted discovery commands before remediation when critical context is missing.
+- When confidence is LOW or MEDIUM, explain what signal would improve confidence.
 `;
 }

@@ -11,7 +11,11 @@
 <p align="center">
   <em>Built for infrastructure operators, self-hosters and security workflows.</em>
 </p>
-
+<p align="center">
+  <a href="https://github.com/sponsors/shadowbipnode">
+    <img src="https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-pink?logo=github-sponsors" alt="Sponsor">
+  </a>
+</p>
 <p align="center">
   <img src="assets/sysai-demo.gif" alt="SysAI Demo" width="100%">
 </p>

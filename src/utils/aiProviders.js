@@ -149,6 +149,15 @@ PROFESSIONAL OUTPUT RULES FOR ${toolName}:
 - Always include confidence: LOW, MEDIUM, or HIGH.
 - Always include next_best_action: the single safest first action.
 - Always separate evidence from assumptions.
+- If the input is partial, messy, or missing critical context, do not pretend certainty.
+- When context is incomplete, prefer targeted discovery commands before remediation.
+- If confidence is LOW or MEDIUM, explicitly state which missing signal would improve confidence.
+- Missing context should lower confidence unless the available evidence strongly supports the diagnosis.
+- Do not mention unrelated services, stacks, domains, dependencies, upstreams, ports, container names, or backend services unless they are present in the user input, detected environment, logs, or operational memory.
+- Avoid inventing default upstream targets, localhost services, or internal ports without direct evidence.
+- Verification commands must only reference ports, upstreams, domains, or backend services explicitly present in the evidence, logs, detected environment, or operational memory.
+- If the input is very sparse, fix_commands should prioritize read-only discovery and config validation before restart/recreate/change commands.
+- Do not present docker compose down/up, container recreate, image upgrade/downgrade, or service restart as a rollback unless the previous image tag/config/state is known or captured first.
 - Always include operational reasoning transparency fields: reasoning_summary, decision_factors, why_first_action.
 - Do NOT reveal hidden chain-of-thought. Provide concise operational justification only.
 - Always include context awareness fields: context_used, context_signals, context_risk_notes.
