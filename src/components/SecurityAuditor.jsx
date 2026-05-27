@@ -2,6 +2,7 @@ import { useState } from "react";
 import ProfessionalResult from "./ProfessionalResult";
 import { portScan, tlsCheck, sshAudit } from "../utils/scanners";
 import { detectSecrets } from "../utils/secretDetector";
+import { auditDockerCompose } from "../utils/dockerAudit";
 
 const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
   const [mode, setMode] = useState(0);
@@ -57,8 +58,8 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
   const handleAudit = async () => {
     if (mode === 0 && !sourceText.trim()) return;
-    if (mode === 1 && scanType !== "secrets" && !targetHost.trim()) return;
-    if (mode === 1 && scanType === "secrets" && !sourceText.trim()) return;
+    if (mode === 1 && scanType !== "secrets" && scanType !== "docker" && !targetHost.trim()) return;
+    if (mode === 1 && (scanType === "secrets" || scanType === "docker") && !sourceText.trim()) return;
     
     setAnalyzing(true);
     setResult(null);
@@ -205,6 +206,73 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           }
 
           updateProgress(90, "Secret analysis complete...");
+        } else if (scanType === "docker") {
+          updateProgress(20, "Running local Docker Compose audit...");
+
+          const findings = auditDockerCompose(sourceText);
+
+          updateProgress(70, "Preparing Docker security report...");
+
+          response = {
+            severity: findings.some((f) => f.severity === "CRITICAL")
+              ? "CRITICAL"
+              : findings.some((f) => f.severity === "HIGH")
+                ? "HIGH"
+                : findings.some((f) => f.severity === "MEDIUM")
+                  ? "MEDIUM"
+                  : "LOW",
+            confidence: "HIGH",
+            requires_sudo: false,
+            detected_stack: ["docker", "compose", "local-analysis"],
+            title: findings.length > 0
+              ? "Docker Compose security exposure detected"
+              : "No obvious Docker Compose exposure detected",
+            summary: findings.length > 0
+              ? `Detected ${findings.length} Docker Compose security or operational hardening findings.`
+              : "No obvious high-risk Docker Compose patterns were detected in the provided input.",
+            root_cause: findings.length > 0
+              ? "The compose file contains one or more risky container runtime, networking, exposure, or hardening patterns."
+              : "No direct risky Docker Compose pattern matched the provided content.",
+            next_best_action: findings.length > 0
+              ? "Review exposed ports, privileged containers and Docker socket mounts before deploying."
+              : "Manually review environment-specific requirements and exposed ports before production deployment.",
+            evidence: findings.map((f) => `${f.title}: ${f.evidence}`),
+            assumptions: [
+              "This audit is based on static Docker Compose text analysis.",
+              "Runtime container state, firewall rules and reverse proxy exposure were not verified."
+            ],
+            remediation_safety: "READ_ONLY_SAFE",
+            evidence_quality: findings.length > 0 ? "DIRECT_EVIDENCE" : "PARTIAL_EVIDENCE",
+            rollback_confidence: "ROLLBACK_NOT_REQUIRED",
+            verification_strength: "STRONG_VERIFICATION",
+            verification_reason: "The detector directly analyzed the provided Docker Compose content locally.",
+            verification_limitations: [
+              "This does not prove the services are reachable from the public internet.",
+              "Runtime Docker state and firewall rules require separate verification."
+            ],
+            fix_commands: findings.length > 0
+              ? findings.map((f) => `# ${f.remediation}`)
+              : ["# No remediation required from this static scan result"],
+            verification_commands: [
+              "docker compose config",
+              "docker ps --format 'table {{.Names}}\t{{.Ports}}\t{{.Status}}'",
+              "ss -tulpn"
+            ],
+            rollback_commands: [
+              "No rollback needed for read-only checks."
+            ],
+            recommendations: findings.length > 0
+              ? findings.map((f) => f.remediation).join("\n")
+              : "Continue using pinned versions, healthchecks and least-privilege container settings.",
+            prevention: [
+              "Pin image versions instead of using latest tags.",
+              "Avoid privileged mode unless strictly required.",
+              "Avoid mounting /var/run/docker.sock into containers.",
+              "Keep databases on internal Docker networks unless public exposure is intentional."
+            ].join("\n")
+          };
+
+          updateProgress(90, "Docker audit complete...");
         }
       } catch (error) {
         response = { report: `Errore: ${error.message}`, recommendations: "Riprova più tardi" };
@@ -323,10 +391,17 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
                 border: `1px solid ${scanType === "secrets" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
               }}>🔑 Secret Detection</button>
+              <button onClick={() => setScanType("docker")} style={{
+                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
+                background: scanType === "docker" ? "#00D4AA" : "#1A1F2E",
+                color: scanType === "docker" ? "#0B0E14" : "#8B95A8",
+                border: `1px solid ${scanType === "docker" ? "#00D4AA" : "#1E2535"}`,
+                cursor: "pointer",
+              }}>🐳 Docker Audit</button>
             </div>
           </div>
 
-          {scanType !== "secrets" ? (
+          {scanType !== "secrets" && scanType !== "docker" ? (
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
                 🌐 IP o Dominio
@@ -345,12 +420,16 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           ) : (
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-                🔑 Config / .env / docker-compose / script
+                {scanType === "docker" ? "🐳 docker-compose.yml" : "🔑 Config / .env / docker-compose / script"}
               </label>
               <textarea
                 value={sourceText}
                 onChange={(e) => setSourceText(e.target.value)}
-                placeholder={"Paste configuration content here...\n\nExample:\nDATABASE_URL=postgres://user:password@localhost:5432/app\nAPI_TOKEN=..."}
+                placeholder={
+                  scanType === "docker"
+                    ? "Paste docker-compose.yml content here..."
+                    : "Paste configuration content here...\n\nExample:\nDATABASE_URL=postgres://user:password@localhost:5432/app\nAPI_TOKEN=..."
+                }
                 style={{
                   width: "100%", height: 220, padding: 16, borderRadius: 12,
                   background: "#131720", border: "1px solid #1E2535",
@@ -385,7 +464,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         marginTop: 12, padding: "12px 28px", background: "#00D4AA", color: "#0B0E14",
         border: "none", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer",
       }}>
-        {analyzing ? t.securityAuditorPage.analyzing : scanType === "secrets" ? "Analyze Secrets" : t.securityAuditorPage.analyze}
+        {analyzing ? t.securityAuditorPage.analyzing : scanType === "secrets" ? "Analyze Secrets" : scanType === "docker" ? "Analyze Docker" : t.securityAuditorPage.analyze}
       </button>
 
       {analyzing && progress && (
