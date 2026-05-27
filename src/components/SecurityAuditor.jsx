@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ProfessionalResult from "./ProfessionalResult";
 import { portScan, tlsCheck, sshAudit } from "../utils/scanners";
+import { detectSecrets } from "../utils/secretDetector";
 
 const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
   const [mode, setMode] = useState(0);
@@ -56,7 +57,8 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
   const handleAudit = async () => {
     if (mode === 0 && !sourceText.trim()) return;
-    if (mode === 1 && !targetHost.trim()) return;
+    if (mode === 1 && scanType !== "secrets" && !targetHost.trim()) return;
+    if (mode === 1 && scanType === "secrets" && !sourceText.trim()) return;
     
     setAnalyzing(true);
     setResult(null);
@@ -103,6 +105,106 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           } else {
             response = { report: `Errore SSH: ${scanResult.output}`, recommendations: "Verifica che il target abbia SSH sulla porta 22" };
           }
+        } else if (scanType === "secrets") {
+          updateProgress(20, "Running local secret detection...");
+
+          const findings = detectSecrets(sourceText);
+
+          updateProgress(70, "Preparing operational security report...");
+
+          if (findings.length === 0) {
+            response = {
+              severity: "LOW",
+              confidence: "HIGH",
+              requires_sudo: false,
+              detected_stack: ["local-analysis", "secret-detection"],
+              title: "No obvious secrets detected",
+              summary: "No known secrets or high-entropy tokens were detected in the provided input.",
+              root_cause: "No direct secret pattern matched the provided content.",
+              next_best_action: "Review the input manually if it contains custom or proprietary secret formats.",
+              evidence: [],
+              assumptions: [
+                "Only pattern-based and entropy-based detection was performed.",
+                "Unknown custom token formats may not be detected."
+              ],
+              remediation_safety: "READ_ONLY_SAFE",
+              evidence_quality: "DIRECT_EVIDENCE",
+              rollback_confidence: "ROLLBACK_NOT_REQUIRED",
+              verification_strength: "STRONG_VERIFICATION",
+              verification_reason: "The analysis was fully local and directly inspected the provided input.",
+              verification_limitations: [
+                "Custom internal token formats may not match known patterns.",
+                "Entropy detection may miss short secrets."
+              ],
+              fix_commands: [
+                "# No remediation required from this scan result"
+              ],
+              verification_commands: [
+                "# Re-run the scan after adding or changing configuration content"
+              ],
+              rollback_commands: [
+                "No rollback needed for read-only checks."
+              ],
+              recommendations: [
+                "Keep secrets outside source-controlled configuration files.",
+                "Use environment-specific secret storage where possible."
+              ],
+              prevention: "Use pre-commit secret scanning before committing configuration files."
+            };
+          } else {
+            response = {
+              severity: findings.some((f) => f.severity === "CRITICAL")
+                ? "CRITICAL"
+                : findings.some((f) => f.severity === "HIGH")
+                  ? "HIGH"
+                  : "MEDIUM",
+              confidence: "HIGH",
+              requires_sudo: false,
+              detected_stack: ["local-analysis", "secret-detection"],
+              title: "Potential secrets and sensitive credentials detected",
+              summary: `Detected ${findings.length} possible secrets or sensitive values inside the provided content.`,
+              root_cause: "The provided content appears to contain hardcoded credentials, tokens, private keys, or high-entropy secret-like values.",
+              next_best_action: "Remove the exposed secret from the file and rotate the credential if it was committed, shared, or deployed.",
+              evidence: findings.map((f) => `${f.type}: ${f.value}`),
+              assumptions: [
+                "Pattern-based detection may produce false positives.",
+                "Manual verification is recommended before rotating production credentials."
+              ],
+              remediation_safety: "REVERSIBLE_SAFE",
+              evidence_quality: "DIRECT_EVIDENCE",
+              rollback_confidence: "ROLLBACK_NOT_REQUIRED",
+              verification_strength: "STRONG_VERIFICATION",
+              verification_reason: "The detector directly analyzed the provided content locally using deterministic matching.",
+              verification_limitations: [
+                "Unknown custom token formats may not be detected.",
+                "Masked or partially redacted secrets may not be classified correctly."
+              ],
+              fix_commands: [
+                "# Move secrets out of plaintext config files",
+                "# Rotate any exposed credentials before redeploying",
+                "# Replace hardcoded values with environment variables or a secret manager"
+              ],
+              verification_commands: [
+                "# Re-run Secret Detection after removing the exposed value",
+                "# Verify the application still starts with the new secret source"
+              ],
+              rollback_commands: [
+                "No rollback needed for read-only checks."
+              ],
+              recommendations: [
+                "Move secrets into environment variables, Docker secrets, or a dedicated secret manager.",
+                "Rotate exposed credentials immediately if they were committed, shared, or deployed.",
+                "Avoid storing plaintext credentials inside compose files, scripts, or repository-tracked configs."
+              ].join("\n"),
+              prevention: [
+                "Use .gitignore for local secret files.",
+                "Add secret scanning to pre-commit or CI workflows.",
+                "Prefer short-lived tokens and scoped credentials."
+              ].join("\n")
+            };
+          }
+
+          updateProgress(90, "Secret analysis complete...");
         }
       } catch (error) {
         response = { report: `Errore: ${error.message}`, recommendations: "Riprova più tardi" };
@@ -214,24 +316,50 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
                 border: `1px solid ${scanType === "ssh" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
               }}>🖥️ SSH Audit</button>
+              <button onClick={() => setScanType("secrets")} style={{
+                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
+                background: scanType === "secrets" ? "#00D4AA" : "#1A1F2E",
+                color: scanType === "secrets" ? "#0B0E14" : "#8B95A8",
+                border: `1px solid ${scanType === "secrets" ? "#00D4AA" : "#1E2535"}`,
+                cursor: "pointer",
+              }}>🔑 Secret Detection</button>
             </div>
           </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-              🌐 IP o Dominio
-            </label>
-            <input
-              value={targetHost}
-              onChange={(e) => setTargetHost(e.target.value)}
-              placeholder="es. 192.168.1.1 o example.com"
-              style={{
-                width: "100%", padding: "12px 16px", borderRadius: 12,
-                background: "#131720", border: "1px solid #1E2535",
-                color: "#E8ECF4", fontSize: 14,
-              }}
-            />
-          </div>
+          {scanType !== "secrets" ? (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
+                🌐 IP o Dominio
+              </label>
+              <input
+                value={targetHost}
+                onChange={(e) => setTargetHost(e.target.value)}
+                placeholder="es. 192.168.1.1 o example.com"
+                style={{
+                  width: "100%", padding: "12px 16px", borderRadius: 12,
+                  background: "#131720", border: "1px solid #1E2535",
+                  color: "#E8ECF4", fontSize: 14,
+                }}
+              />
+            </div>
+          ) : (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
+                🔑 Config / .env / docker-compose / script
+              </label>
+              <textarea
+                value={sourceText}
+                onChange={(e) => setSourceText(e.target.value)}
+                placeholder={"Paste configuration content here...\n\nExample:\nDATABASE_URL=postgres://user:password@localhost:5432/app\nAPI_TOKEN=..."}
+                style={{
+                  width: "100%", height: 220, padding: 16, borderRadius: 12,
+                  background: "#131720", border: "1px solid #1E2535",
+                  color: "#E8ECF4", fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+                  resize: "vertical",
+                }}
+              />
+            </div>
+          )}
 
           {scanType === "ports" && (
             <div style={{ marginBottom: 16 }}>
@@ -257,7 +385,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         marginTop: 12, padding: "12px 28px", background: "#00D4AA", color: "#0B0E14",
         border: "none", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer",
       }}>
-        {analyzing ? t.securityAuditorPage.analyzing : t.securityAuditorPage.analyze}
+        {analyzing ? t.securityAuditorPage.analyzing : scanType === "secrets" ? "Analyze Secrets" : t.securityAuditorPage.analyze}
       </button>
 
       {analyzing && progress && (
