@@ -3,6 +3,7 @@ import ProfessionalResult from "./ProfessionalResult";
 import { portScan, tlsCheck, sshAudit } from "../utils/scanners";
 import { detectSecrets } from "../utils/secretDetector";
 import { auditDockerCompose } from "../utils/dockerAudit";
+import { auditPermissions } from "../utils/permissionAudit";
 
 const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
   const [mode, setMode] = useState(0);
@@ -58,8 +59,8 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
   const handleAudit = async () => {
     if (mode === 0 && !sourceText.trim()) return;
-    if (mode === 1 && scanType !== "secrets" && scanType !== "docker" && !targetHost.trim()) return;
-    if (mode === 1 && (scanType === "secrets" || scanType === "docker") && !sourceText.trim()) return;
+    if (mode === 1 && !["secrets", "docker", "permissions"].includes(scanType) && !targetHost.trim()) return;
+    if (mode === 1 && ["secrets", "docker", "permissions"].includes(scanType) && !sourceText.trim()) return;
     
     setAnalyzing(true);
     setResult(null);
@@ -273,6 +274,73 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           };
 
           updateProgress(90, "Docker audit complete...");
+        } else if (scanType === "permissions") {
+          updateProgress(20, "Running local permission audit...");
+
+          const findings = auditPermissions(sourceText);
+
+          updateProgress(70, "Preparing permission security report...");
+
+          response = {
+            severity: findings.some((f) => f.severity === "CRITICAL")
+              ? "CRITICAL"
+              : findings.some((f) => f.severity === "HIGH")
+                ? "HIGH"
+                : findings.some((f) => f.severity === "MEDIUM")
+                  ? "MEDIUM"
+                  : "LOW",
+            confidence: "HIGH",
+            requires_sudo: false,
+            detected_stack: ["permissions", "filesystem", "local-analysis"],
+            title: findings.length > 0
+              ? "Filesystem permission risks detected"
+              : "No obvious permission risks detected",
+            summary: findings.length > 0
+              ? `Detected ${findings.length} filesystem permission or ownership risk findings.`
+              : "No obvious high-risk permission patterns were detected in the provided input.",
+            root_cause: findings.length > 0
+              ? "The provided permission output contains risky ownership, world-writable access, SUID exposure, Docker socket access, or sudoers patterns."
+              : "No direct risky permission pattern matched the provided content.",
+            next_best_action: findings.length > 0
+              ? "Review the listed permission findings before applying chmod/chown changes."
+              : "Manually verify sensitive files such as SSH keys, sudoers entries and secret files.",
+            evidence: findings.map((f) => `${f.title}: ${f.evidence}`),
+            assumptions: [
+              "This audit is based on pasted filesystem or sudoers output.",
+              "Actual ownership and runtime access control were not independently verified."
+            ],
+            remediation_safety: "READ_ONLY_SAFE",
+            evidence_quality: findings.length > 0 ? "DIRECT_EVIDENCE" : "PARTIAL_EVIDENCE",
+            rollback_confidence: "ROLLBACK_NOT_REQUIRED",
+            verification_strength: "STRONG_VERIFICATION",
+            verification_reason: "The detector directly analyzed the provided permission output locally.",
+            verification_limitations: [
+              "This does not inspect the live filesystem unless the user pasted complete command output.",
+              "Some legitimate special permissions may be intentional."
+            ],
+            fix_commands: findings.length > 0
+              ? findings.map((f) => `# ${f.remediation}`)
+              : ["# No remediation required from this static scan result"],
+            verification_commands: [
+              "ls -la",
+              "find . -perm -002 -ls",
+              "find . -perm -4000 -ls"
+            ],
+            rollback_commands: [
+              "No rollback needed for read-only checks."
+            ],
+            recommendations: findings.length > 0
+              ? findings.map((f) => f.remediation).join("\n")
+              : "Continue reviewing sensitive paths, SSH files and sudoers rules before deployment.",
+            prevention: [
+              "Avoid chmod 777 except in disposable test environments.",
+              "Keep private SSH keys restricted to 600.",
+              "Keep .ssh directories restricted to 700.",
+              "Treat Docker socket access as root-equivalent."
+            ].join("\n")
+          };
+
+          updateProgress(90, "Permission audit complete...");
         }
       } catch (error) {
         response = { report: `Errore: ${error.message}`, recommendations: "Riprova più tardi" };
@@ -398,10 +466,17 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
                 border: `1px solid ${scanType === "docker" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
               }}>🐳 Docker Audit</button>
+              <button onClick={() => setScanType("permissions")} style={{
+                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
+                background: scanType === "permissions" ? "#00D4AA" : "#1A1F2E",
+                color: scanType === "permissions" ? "#0B0E14" : "#8B95A8",
+                border: `1px solid ${scanType === "permissions" ? "#00D4AA" : "#1E2535"}`,
+                cursor: "pointer",
+              }}>🔐 Permission Audit</button>
             </div>
           </div>
 
-          {scanType !== "secrets" && scanType !== "docker" ? (
+          {!["secrets", "docker", "permissions"].includes(scanType) ? (
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
                 🌐 IP o Dominio
