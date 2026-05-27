@@ -4,6 +4,7 @@ import { portScan, tlsCheck, sshAudit } from "../utils/scanners";
 import { detectSecrets } from "../utils/secretDetector";
 import { auditDockerCompose } from "../utils/dockerAudit";
 import { auditPermissions } from "../utils/permissionAudit";
+import { auditNginxConfig } from "../utils/nginxAudit";
 
 const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
   const [mode, setMode] = useState(0);
@@ -59,8 +60,8 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
   const handleAudit = async () => {
     if (mode === 0 && !sourceText.trim()) return;
-    if (mode === 1 && !["secrets", "docker", "permissions"].includes(scanType) && !targetHost.trim()) return;
-    if (mode === 1 && ["secrets", "docker", "permissions"].includes(scanType) && !sourceText.trim()) return;
+    if (mode === 1 && !["secrets", "docker", "permissions", "nginx"].includes(scanType) && !targetHost.trim()) return;
+    if (mode === 1 && ["secrets", "docker", "permissions", "nginx"].includes(scanType) && !sourceText.trim()) return;
     
     setAnalyzing(true);
     setResult(null);
@@ -341,6 +342,73 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           };
 
           updateProgress(90, "Permission audit complete...");
+        } else if (scanType === "nginx") {
+          updateProgress(20, "Running local reverse proxy audit...");
+
+          const findings = auditNginxConfig(sourceText);
+
+          updateProgress(70, "Preparing reverse proxy security report...");
+
+          response = {
+            severity: findings.some((f) => f.severity === "CRITICAL")
+              ? "CRITICAL"
+              : findings.some((f) => f.severity === "HIGH")
+                ? "HIGH"
+                : findings.some((f) => f.severity === "MEDIUM")
+                  ? "MEDIUM"
+                  : "LOW",
+            confidence: "HIGH",
+            requires_sudo: false,
+            detected_stack: ["reverse-proxy", "nginx", "local-analysis"],
+            title: findings.length > 0
+              ? "Reverse proxy security and exposure risks detected"
+              : "No obvious reverse proxy risks detected",
+            summary: findings.length > 0
+              ? `Detected ${findings.length} reverse proxy security or hardening findings.`
+              : "No obvious high-risk reverse proxy patterns were detected in the provided input.",
+            root_cause: findings.length > 0
+              ? "The reverse proxy configuration contains missing hardening headers, exposure patterns, TLS concerns, or access-control gaps."
+              : "No direct risky reverse proxy pattern matched the provided content.",
+            next_best_action: findings.length > 0
+              ? "Review TLS, headers, exposed admin paths and access-control rules before deployment."
+              : "Manually verify TLS, headers, upstream behavior and access control before production deployment.",
+            evidence: findings.map((f) => `${f.title}: ${f.evidence}`),
+            assumptions: [
+              "This audit is based on static reverse proxy configuration analysis.",
+              "Runtime TLS behavior, DNS routing and upstream reachability were not verified."
+            ],
+            remediation_safety: "READ_ONLY_SAFE",
+            evidence_quality: findings.length > 0 ? "DIRECT_EVIDENCE" : "PARTIAL_EVIDENCE",
+            rollback_confidence: "ROLLBACK_NOT_REQUIRED",
+            verification_strength: "STRONG_VERIFICATION",
+            verification_reason: "The detector directly analyzed the provided reverse proxy configuration locally.",
+            verification_limitations: [
+              "This does not perform a live HTTP or TLS request.",
+              "Some protections may exist in included files not pasted into the input."
+            ],
+            fix_commands: findings.length > 0
+              ? findings.map((f) => `# ${f.remediation}`)
+              : ["# No remediation required from this static scan result"],
+            verification_commands: [
+              "nginx -t",
+              "curl -I https://example.com",
+              "openssl s_client -connect example.com:443 -servername example.com"
+            ],
+            rollback_commands: [
+              "No rollback needed for read-only checks."
+            ],
+            recommendations: findings.length > 0
+              ? findings.map((f) => f.remediation).join("\n")
+              : "Continue reviewing TLS, security headers and access-control rules before deployment.",
+            prevention: [
+              "Use HTTPS with strong TLS defaults.",
+              "Redirect HTTP to HTTPS.",
+              "Add security headers for public web services.",
+              "Protect administrative paths with authentication and IP restrictions."
+            ].join("\n")
+          };
+
+          updateProgress(90, "Reverse proxy audit complete...");
         }
       } catch (error) {
         response = { report: `Errore: ${error.message}`, recommendations: "Riprova più tardi" };
@@ -473,10 +541,17 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
                 border: `1px solid ${scanType === "permissions" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
               }}>🔐 Permission Audit</button>
+              <button onClick={() => setScanType("nginx")} style={{
+                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
+                background: scanType === "nginx" ? "#00D4AA" : "#1A1F2E",
+                color: scanType === "nginx" ? "#0B0E14" : "#8B95A8",
+                border: `1px solid ${scanType === "nginx" ? "#00D4AA" : "#1E2535"}`,
+                cursor: "pointer",
+              }}>🌐 Proxy Audit</button>
             </div>
           </div>
 
-          {!["secrets", "docker", "permissions"].includes(scanType) ? (
+          {!["secrets", "docker", "permissions", "nginx"].includes(scanType) ? (
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
                 🌐 IP o Dominio
@@ -495,7 +570,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           ) : (
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-                {scanType === "docker" ? "🐳 docker-compose.yml" : "🔑 Config / .env / docker-compose / script"}
+                {scanType === "docker" ? "🐳 docker-compose.yml" : scanType === "permissions" ? "🔐 ls -la / sudoers / permission output" : scanType === "nginx" ? "🌐 nginx / Caddy / reverse proxy config" : "🔑 Config / .env / docker-compose / script"}
               </label>
               <textarea
                 value={sourceText}
@@ -503,7 +578,11 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
                 placeholder={
                   scanType === "docker"
                     ? "Paste docker-compose.yml content here..."
-                    : "Paste configuration content here...\n\nExample:\nDATABASE_URL=postgres://user:password@localhost:5432/app\nAPI_TOKEN=..."
+                    : scanType === "permissions"
+                      ? "Paste ls -la, find output or sudoers snippets here..."
+                      : scanType === "nginx"
+                        ? "Paste nginx, Caddy or reverse proxy configuration here..."
+                        : "Paste configuration content here...\n\nExample:\nDATABASE_URL=postgres://user:password@localhost:5432/app\nAPI_TOKEN=..."
                 }
                 style={{
                   width: "100%", height: 220, padding: 16, borderRadius: 12,
@@ -539,7 +618,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         marginTop: 12, padding: "12px 28px", background: "#00D4AA", color: "#0B0E14",
         border: "none", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer",
       }}>
-        {analyzing ? t.securityAuditorPage.analyzing : scanType === "secrets" ? "Analyze Secrets" : scanType === "docker" ? "Analyze Docker" : t.securityAuditorPage.analyze}
+        {analyzing ? t.securityAuditorPage.analyzing : scanType === "secrets" ? "Analyze Secrets" : scanType === "docker" ? "Analyze Docker" : scanType === "permissions" ? "Analyze Permissions" : scanType === "nginx" ? "Analyze Proxy" : t.securityAuditorPage.analyze}
       </button>
 
       {analyzing && progress && (
