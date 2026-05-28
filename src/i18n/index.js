@@ -22,7 +22,7 @@ const LANGS = {
       configGenerator: { name: "Config Generator", desc: "Generate production-ready configs", icon: "⚙️" },
       troubleshooter: { name: "Troubleshooter", desc: "Describe the problem → guided step-by-step diagnosis", icon: "🔧" },
       scriptBuilder: { name: "Script Builder", desc: "Describe automation → get complete bash/python scripts", icon: "📜" },
-      securityAuditor: { name: "Security Auditor", desc: "Paste config or describe setup → get hardening tips", icon: "🛡️" },
+      securityAuditor: { name: "Security & Exposure Intelligence", desc: "Infrastructure analysis, security audits, exposure discovery and operational hardening", icon: "🛡️" },
     },
     settingsPage: {
       title: "Settings",
@@ -81,8 +81,8 @@ const LANGS = {
       generating: "Generating...",
     },
     securityAuditorPage: {
-      title: "Security Auditor",
-      subtitle: "Paste config or describe setup → get hardening tips",
+      title: "Security & Exposure Intelligence",
+      subtitle: "Infrastructure visibility, local-first security audits, exposure discovery and operational hardening workflows",
       typeLabel: "Input type",
       types: ["Paste configuration", "Describe your setup"],
       sourceLabel: "Configuration or description",
@@ -121,7 +121,7 @@ const LANGS = {
       configGenerator: { name: "Genera Config", desc: "Configurazioni pronte per produzione", icon: "⚙️" },
       troubleshooter: { name: "Troubleshooter", desc: "Descrivi il problema → diagnosi guidata passo passo", icon: "🔧" },
       scriptBuilder: { name: "Script Builder", desc: "Descrivi l'automazione → script bash/python completi", icon: "📜" },
-      securityAuditor: { name: "Audit Sicurezza", desc: "Incolla config o descrivi setup → suggerimenti hardening", icon: "🛡️" },
+      securityAuditor: { name: "Security & Exposure Intelligence", desc: "Analisi infrastruttura, audit sicurezza, discovery esposizione e hardening operativo", icon: "🛡️" },
     },
     settingsPage: {
       title: "Impostazioni",
@@ -180,8 +180,8 @@ const LANGS = {
       generating: "Generazione...",
     },
     securityAuditorPage: {
-      title: "Audit Sicurezza",
-      subtitle: "Incolla config o descrivi setup → suggerimenti hardening",
+      title: "Security & Exposure Intelligence",
+      subtitle: "Visibilità infrastruttura, audit sicurezza local-first, discovery esposizione e workflow di hardening operativo",
       typeLabel: "Tipo di input",
       types: ["Incolla configurazione", "Descrivi il setup"],
       sourceLabel: "Configurazione o descrizione",
@@ -220,7 +220,7 @@ const LANGS = {
       configGenerator: { name: "Générateur de Config", desc: "Génère des configs prêtes pour la production", icon: "⚙️" },
       troubleshooter: { name: "Dépannage", desc: "Décrivez le problème → diagnostic guidé pas à pas", icon: "🔧" },
       scriptBuilder: { name: "Créateur de Scripts", desc: "Décrivez l'automatisation → scripts bash/python complets", icon: "📜" },
-      securityAuditor: { name: "Audit Sécurité", desc: "Collez config ou décrivez setup → conseils de durcissement", icon: "🛡️" },
+      securityAuditor: { name: "Security & Exposure Intelligence", desc: "Analyse infrastructure, audits sécurité, découverte d’exposition et durcissement opérationnel", icon: "🛡️" },
     },
     settingsPage: {
       title: "Paramètres",
@@ -279,8 +279,8 @@ const LANGS = {
       generating: "Génération...",
     },
     securityAuditorPage: {
-      title: "Audit Sécurité",
-      subtitle: "Collez config ou décrivez setup → conseils de durcissement",
+      title: "Security & Exposure Intelligence",
+      subtitle: "Visibilité infrastructure, audits sécurité local-first, découverte d’exposition et workflows de durcissement opérationnel",
       typeLabel: "Type d'entrée",
       types: ["Coller la configuration", "Décrire l'installation"],
       sourceLabel: "Configuration ou description",
@@ -319,7 +319,7 @@ const LANGS = {
       configGenerator: { name: "Konfigurationsgenerator", desc: "Generiert produktionsbereite Konfigs", icon: "⚙️" },
       troubleshooter: { name: "Fehlersuche", desc: "Problem beschreiben → geführte Schritt-für-Schritt-Diagnose", icon: "🔧" },
       scriptBuilder: { name: "Script-Builder", desc: "Automatisierung beschreiben → komplette bash/python Scripts", icon: "📜" },
-      securityAuditor: { name: "Sicherheitsaudit", desc: "Config einfügen oder Setup beschreiben → Härtungstipps", icon: "🛡️" },
+      securityAuditor: { name: "Security & Exposure Intelligence", desc: "Infrastrukturanalyse, Sicherheitsaudits, Exposure Discovery und operatives Hardening", icon: "🛡️" },
     },
     settingsPage: {
       title: "Einstellungen",
@@ -378,8 +378,8 @@ const LANGS = {
       generating: "Generiere...",
     },
     securityAuditorPage: {
-      title: "Sicherheitsaudit",
-      subtitle: "Config einfügen oder Setup beschreiben → Härtungstipps",
+      title: "Security & Exposure Intelligence",
+      subtitle: "Infrastruktur-Sichtbarkeit, lokale Sicherheitsaudits, Exposure Discovery und operative Hardening-Workflows",
       typeLabel: "Eingabetyp",
       types: ["Konfiguration einfügen", "Setup beschreiben"],
       sourceLabel: "Konfiguration oder Beschreibung",
@@ -418,7 +418,7 @@ const LANGS = {
       configGenerator: { name: "Generador de Config", desc: "Genera configs listas para producción", icon: "⚙️" },
       troubleshooter: { name: "Solucionador", desc: "Describe el problema → diagnóstico guiado paso a paso", icon: "🔧" },
       scriptBuilder: { name: "Creador de Scripts", desc: "Describe la automatización → scripts bash/python completos", icon: "📜" },
-      securityAuditor: { name: "Auditor de Seguridad", desc: "Pega config o describe setup → consejos de hardening", icon: "🛡️" },
+      securityAuditor: { name: "Security & Exposure Intelligence", desc: "Análisis de infraestructura, auditorías de seguridad, descubrimiento de exposición y hardening operativo", icon: "🛡️" },
     },
     settingsPage: {
       title: "Ajustes",
@@ -477,8 +477,8 @@ const LANGS = {
       generating: "Generando...",
     },
     securityAuditorPage: {
-      title: "Auditor de Seguridad",
-      subtitle: "Pega config o describe setup → consejos de hardening",
+      title: "Security & Exposure Intelligence",
+      subtitle: "Visibilidad de infraestructura, auditorías de seguridad local-first, descubrimiento de exposición y workflows de hardening operativo",
       typeLabel: "Tipo de entrada",
       types: ["Pegar configuración", "Describir el setup"],
       sourceLabel: "Configuración o descripción",
