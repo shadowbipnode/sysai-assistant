@@ -66,13 +66,16 @@ export function parseSshAudit(output = "") {
     }
   }
 
-  result.score =
-    Math.max(
-      0,
+  result.score = Math.max(
+    15,
+    Math.min(
+      100,
       100 -
-      (result.failures.length * 15) -
-      (result.warnings.length * 5)
-    );
+      (result.failures.length * 8) -
+      (result.warnings.length * 3) -
+      (result.recommendations.length * 1)
+    )
+  );
 
   return result;
 }

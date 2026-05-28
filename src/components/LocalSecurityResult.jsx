@@ -424,7 +424,18 @@ const LocalSecurityResult = ({ result, onAnalyzeWithAI }) => {
                       border: "1px solid #263149"
                     }}>
                       <div style={{ color: "#8B95A8", fontSize: 11 }}>{item.label}</div>
-                      <div style={{ fontSize: 20, fontWeight: 900, color: item.label === "Score" ? "#00D4AA" : "#E8ECF4" }}>
+                      <div style={{
+                          fontSize: 20,
+                          fontWeight: 900,
+                          color:
+                            item.label !== "Score"
+                              ? "#E8ECF4"
+                              : parseInt(item.value) >= 85
+                                ? "#00D4AA"
+                                : parseInt(item.value) >= 60
+                                  ? "#FBBF24"
+                                  : "#FF4D6A"
+                        }}>
                         {item.value}
                       </div>
                     </div>
