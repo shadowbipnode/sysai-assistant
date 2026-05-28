@@ -478,7 +478,7 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
     return { success: false, error: 'Target contiene caratteri non validi' };
   }
 
-  console.log(`[SysAI] Scan: ${type} → ${safeTarget}`);
+  if (!['network-stats', 'network-connections'].includes(type)) console.log(`[SysAI] Scan: ${type} → ${safeTarget}`);
 
   try {
     switch (type) {
@@ -499,6 +499,255 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
         const port = options.port || 22;
         const result = await sshAudit(safeTarget, port);
         return { type: 'ssh-audit', target: safeTarget, ...result };
+      }
+
+      case 'ssh-banner': {
+        const net = require('net');
+        const port = options.port || 22;
+
+        const result = await new Promise((resolve) => {
+          const socket = new net.Socket();
+          let banner = '';
+
+          socket.setTimeout(Math.min(options.timeout || 5000, 10000));
+
+          socket.connect(port, safeTarget, () => {});
+
+          socket.on('data', (data) => {
+            banner += data.toString('utf8');
+            socket.destroy();
+          });
+
+          socket.on('timeout', () => {
+            socket.destroy();
+            resolve({
+              success: false,
+              type: 'ssh-banner',
+              target: safeTarget,
+              port,
+              error: 'Connection timeout'
+            });
+          });
+
+          socket.on('error', (error) => {
+            resolve({
+              success: false,
+              type: 'ssh-banner',
+              target: safeTarget,
+              port,
+              error: error.message
+            });
+          });
+
+          socket.on('close', () => {
+            if (banner.trim()) {
+              const cleanBanner = banner.trim();
+              const match = cleanBanner.match(/SSH-\d\.\d-([^\s]+)/);
+
+              resolve({
+                success: true,
+                type: 'ssh-banner',
+                target: safeTarget,
+                port,
+                banner: cleanBanner,
+                software: match?.[1] || '',
+                metadataLeak: Boolean(match?.[1])
+              });
+            }
+          });
+        });
+
+        return result;
+      }
+
+      case 'network-connections': {
+        const { execFile } = require('child_process');
+
+        const output = await new Promise((resolve) => {
+          execFile('ss', ['-tunp'], { timeout: 5000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+            if (error) {
+              resolve(stderr || error.message || '');
+              return;
+            }
+
+            resolve(stdout || '');
+          });
+        });
+
+        const lines = String(output)
+          .split('\n')
+          .slice(1)
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+        const connections = lines.slice(0, 100).map((line) => {
+          const parts = line.split(/\s+/);
+
+          return {
+            netid: parts[0] || '',
+            state: parts[1] || '',
+            recvQ: parts[2] || '',
+            sendQ: parts[3] || '',
+            local: parts[4] || '',
+            peer: parts[5] || '',
+            process: parts.slice(6).join(' ')
+          };
+        });
+
+        return {
+          success: true,
+          type: 'network-connections',
+          connections,
+          timestamp: Date.now()
+        };
+      }
+
+      case 'network-stats': {
+        const fs = require('fs');
+        const raw = fs.readFileSync('/proc/net/dev', 'utf8');
+
+        const interfaces = raw
+          .split('\n')
+          .slice(2)
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => {
+            const [ifacePart, dataPart] = line.split(':');
+            const values = dataPart.trim().split(/\s+/).map(Number);
+
+            return {
+              interface: ifacePart.trim(),
+              rxBytes: values[0],
+              rxPackets: values[1],
+              txBytes: values[8],
+              txPackets: values[9]
+            };
+          })
+          .filter((item) => item.interface !== 'lo');
+
+        return {
+          success: true,
+          type: 'network-stats',
+          interfaces,
+          timestamp: Date.now()
+        };
+      }
+
+
+      case 'advanced-http-probe': {
+        console.log(`[SysAI] Scan: advanced-http-probe → ${safeTarget}`);
+
+        const protocol = options.protocol || 'https';
+        const port = options.port || (protocol === 'https' ? 443 : 80);
+
+        const url = `${protocol}://${safeTarget}${port === 80 || port === 443 ? '' : `:${port}`}`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
+        try {
+          const response = await fetch(url, {
+            method: 'GET',
+            redirect: 'follow',
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'SysAI-Infrastructure-Intelligence/2.0'
+            }
+          });
+
+          const html = await response.text();
+
+          clearTimeout(timeout);
+
+          const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+
+          const fingerprint = {
+            wordpress: /wp-content|wordpress/i.test(html),
+            grafana: /grafana-app|grafana/i.test(html),
+            nextcloud: /nextcloud/i.test(html),
+            phpmyadmin: /phpmyadmin/i.test(html),
+            loginPanel: /login|signin|auth/i.test(html),
+          };
+
+          console.log('[SysAI] Advanced probe success:', {
+            title: titleMatch?.[1]?.trim() || '',
+            status: response.status,
+            finalUrl: response.url,
+            htmlLength: html.length,
+            fingerprint
+          });
+
+          return {
+            success: true,
+            type: 'advanced-http-probe',
+            url,
+            status: response.status,
+            finalUrl: response.url,
+            title: titleMatch?.[1]?.trim() || '',
+            htmlLength: html.length,
+            fingerprint,
+            headers: Object.fromEntries(response.headers.entries())
+          };
+        } catch (error) {
+          clearTimeout(timeout);
+
+          console.error('[SysAI] Advanced probe failed:', error);
+
+          return {
+            success: false,
+            type: 'advanced-http-probe',
+            url,
+            error: error.message
+          };
+        }
+
+        break;
+      }
+
+      case 'http-headers': {
+        const protocol = options.protocol || 'https';
+        const port = options.port || (protocol === 'https' ? 443 : 80);
+        const url = `${protocol}://${safeTarget}${port === 80 || port === 443 ? '' : `:${port}`}`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), Math.min(options.timeout || 5000, 10000));
+
+        try {
+          const response = await fetch(url, {
+            method: 'GET',
+            redirect: 'manual',
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'SysAI-Infrastructure-Intelligence/1.0'
+            }
+          });
+
+          clearTimeout(timeout);
+
+          const headers = {};
+          response.headers.forEach((value, key) => {
+            headers[key] = value;
+          });
+
+          return {
+            success: true,
+            type: 'http-headers',
+            target: safeTarget,
+            url,
+            status: response.status,
+            statusText: response.statusText,
+            headers
+          };
+        } catch (error) {
+          clearTimeout(timeout);
+          return {
+            success: false,
+            type: 'http-headers',
+            target: safeTarget,
+            url,
+            error: error.message
+          };
+        }
       }
 
       default:

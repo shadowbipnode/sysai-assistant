@@ -1,10 +1,16 @@
 import { useState } from "react";
 import ProfessionalResult from "./ProfessionalResult";
-import { portScan, tlsCheck, sshAudit } from "../utils/scanners";
+import LocalSecurityResult from "./LocalSecurityResult";
+import NetworkVisibility from "./NetworkVisibility";
+import { portScan, tlsCheck, sshAudit, httpHeadersCheck, advancedHttpProbe, sshBanner, sshAuditProbe } from "../utils/scanners";
 import { detectSecrets } from "../utils/secretDetector";
 import { auditDockerCompose } from "../utils/dockerAudit";
 import { auditPermissions } from "../utils/permissionAudit";
 import { auditNginxConfig } from "../utils/nginxAudit";
+import { buildInfrastructureSummary, COMMON_PORTS } from "../utils/infrastructureIntel";
+import { fingerprintHttp } from "../utils/httpFingerprint";
+import { buildServiceMatrix } from "../utils/serviceOrchestrator";
+import { parseSshAudit } from "../utils/sshAuditParser";
 
 const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
   const [mode, setMode] = useState(0);
@@ -16,6 +22,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [progress, setProgress] = useState(null);
   const [result, setResult] = useState(null);
+  const [localResult, setLocalResult] = useState(null);
 
   const updateProgress = (percent, label) => {
     setProgress({ percent, label });
@@ -65,6 +72,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
     
     setAnalyzing(true);
     setResult(null);
+    setLocalResult(null);
     updateProgress(5, "Preparing audit workflow...");
     let response;
     
@@ -409,6 +417,240 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           };
 
           updateProgress(90, "Reverse proxy audit complete...");
+        } else if (scanType === "infra") {
+          updateProgress(10, "Running infrastructure discovery...");
+
+          const infraScan = await portScan(targetHost, COMMON_PORTS);
+
+          updateProgress(60, "Correlating exposure signals...");
+
+          const summary = buildInfrastructureSummary(
+            targetHost,
+            infraScan.results || []
+          );
+
+          let findings = [...(summary.findings || [])];
+          let detectedStack = ["infrastructure-intelligence", "network-discovery"];
+
+          const hasHttps = summary.openPorts.some((p) => Number(p.port) === 443);
+          const hasHttp = summary.openPorts.some((p) => Number(p.port) === 80);
+
+          let httpData = null;
+          let tlsData = null;
+          let sshData = null;
+          let sshAuditData = null;
+
+          if (hasHttps || hasHttp) {
+            updateProgress(75, "Fingerprinting HTTP/TLS exposure...");
+
+            const protocol = hasHttps ? "https" : "http";
+
+            httpData = await httpHeadersCheck(targetHost, {
+              protocol
+            });
+
+            if (!httpData?.success && protocol === 'https') {
+              console.log('HTTPS failed, retrying via HTTP...');
+
+              httpData = await httpHeadersCheck(targetHost, {
+                protocol: 'http'
+              });
+            }
+
+            console.log('HTTP DATA DEBUG', httpData);
+
+            if (httpData?.success && httpData.headers) {
+              const fingerprint = fingerprintHttp(
+                httpData.headers,
+                targetHost
+              );
+
+              httpData.fingerprint = fingerprint;
+
+              console.log('CALLING ADVANCED PROBE');
+
+              const advancedProbe = await advancedHttpProbe(
+                targetHost,
+                { protocol }
+              );
+
+              console.log('ADVANCED PROBE RAW', advancedProbe);
+
+              httpData.advancedProbe = advancedProbe;
+
+              console.log('ADVANCED PROBE RESULT', advancedProbe);
+
+              findings.push(...fingerprint.findings);
+
+              detectedStack.push(
+                ...fingerprint.detectedStack.map((s) => s.name)
+              );
+            }
+          }
+
+          const hasSsh = summary.openPorts.some((p) => Number(p.port) === 22);
+
+          if (hasSsh) {
+            updateProgress(82, "Fingerprinting SSH service...");
+
+            sshData = await sshBanner(targetHost, 22);
+
+            if (sshData?.success && sshData.banner) {
+              findings.push({
+                title: "SSH banner disclosure",
+                severity: "LOW",
+                evidence: sshData.banner,
+                remediation: "Banner disclosure is usually acceptable, but review SSH version exposure and hardening."
+              });
+
+              detectedStack.push("SSH");
+            }
+
+            sshAuditData = await sshAuditProbe(targetHost, 22);
+
+            if (sshAuditData?.success && sshAuditData.output) {
+              sshAuditData.parsed = parseSshAudit(
+                sshAuditData.output
+              );
+            }
+
+            console.log("SSH AUDIT RESULT", sshAuditData);
+          }
+
+          if (hasHttps) {
+            tlsData = await tlsCheck(targetHost, 443);
+
+            if (
+              tlsData?.certificate?.selfSigned
+            ) {
+              findings.push({
+                title: "Self-signed TLS certificate detected",
+                severity: "MEDIUM",
+                evidence: "The HTTPS endpoint uses a self-signed certificate.",
+                remediation: "Use a trusted certificate authority for public-facing services."
+              });
+            }
+
+            if (
+              tlsData?.warnings?.length
+            ) {
+              findings.push({
+                title: "TLS warnings detected",
+                severity: "MEDIUM",
+                evidence: tlsData.warnings.join(", "),
+                remediation: "Review TLS configuration and remove legacy or insecure settings."
+              });
+            }
+          }
+
+          const serviceMatrix = buildServiceMatrix(
+            (summary.openPorts || []).map((p) => p.port)
+          );
+
+          const localInfraResult = {
+            title: "Infrastructure X-Ray Result",
+            findings,
+            detectedStack: [...new Set(detectedStack)],
+            openPorts: summary.openPorts || [],
+            scannedPorts: summary.scannedPorts || [],
+            serviceMatrix,
+            httpData,
+            tlsData,
+            sshData,
+            sshAuditData
+          };
+
+          setLocalResult(localInfraResult);
+
+          response = {
+            severity: findings.some((f) => f.severity === "HIGH")
+              ? "HIGH"
+              : findings.some((f) => f.severity === "MEDIUM")
+                ? "MEDIUM"
+                : "LOW",
+            confidence: "HIGH",
+            requires_sudo: false,
+            detected_stack: [...new Set(detectedStack)],
+            title: findings.length > 0
+              ? "Infrastructure exposure findings detected"
+              : "No major infrastructure exposure findings detected",
+
+            summary: findings.length > 0
+              ? `Detected ${findings.length} infrastructure exposure or operational findings.`
+              : "No obvious high-risk exposure patterns were detected from the collected scan results.",
+
+            root_cause: findings.length > 0
+              ? "One or more publicly reachable services may increase operational exposure or attack surface."
+              : "No direct high-risk exposure correlation matched the collected scan results.",
+
+            next_best_action: findings.length > 0
+              ? "Review exposed services, administrative interfaces and sensitive ports."
+              : "Continue validating firewall segmentation and service exposure.",
+
+            evidence: [
+              ...summary.openPorts.map(
+                (p) => `Open port ${p.port}: ${p.service}`
+              ),
+              ...findings.map(
+                (f) => `${f.title}: ${f.evidence}`
+              )
+            ],
+
+            assumptions: [
+              "This is an active network scan against the provided target.",
+              "Service identification is heuristic-based and may not always be accurate."
+            ],
+
+            remediation_safety: "READ_ONLY_SAFE",
+            evidence_quality: findings.length > 0
+              ? "DIRECT_EVIDENCE"
+              : "PARTIAL_EVIDENCE",
+
+            rollback_confidence: "ROLLBACK_NOT_REQUIRED",
+
+            verification_strength: "STRONG_VERIFICATION",
+
+            verification_reason:
+              "The system directly scanned reachable ports and correlated service exposure patterns locally.",
+
+            verification_limitations: [
+              "Filtered ports may not appear in scan results.",
+              "Application fingerprinting is heuristic-based and may not always be accurate."
+            ],
+
+            fix_commands: findings.length > 0
+              ? findings.map((f) => `# ${f.remediation}`)
+              : ["# No remediation required from this scan result"],
+
+            verification_commands: [
+              "ss -tulpn",
+              "ufw status",
+              "docker ps",
+              "nmap TARGET"
+            ],
+
+            rollback_commands: [
+              "No rollback needed for read-only checks."
+            ],
+
+            recommendations: findings.length > 0
+              ? findings.map((f) => f.remediation).join("\n")
+              : "Continue reviewing exposed services and segmentation rules.",
+
+            prevention: [
+              "Avoid exposing internal dashboards directly to the internet.",
+              "Restrict databases to private networks.",
+              "Use reverse proxies and authentication for operational services.",
+              "Continuously review infrastructure exposure."
+            ].join("\n"),
+
+            infrastructure_summary: {
+              scanned_ports: summary.scannedPorts,
+              open_ports: summary.openPorts
+            }
+          };
+
+          updateProgress(90, "Infrastructure analysis complete...");
         }
       } catch (error) {
         response = { report: `Errore: ${error.message}`, recommendations: "Riprova più tardi" };
@@ -548,6 +790,13 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
                 border: `1px solid ${scanType === "nginx" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
               }}>🌐 Proxy Audit</button>
+              <button onClick={() => setScanType("infra")} style={{
+                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
+                background: scanType === "infra" ? "#00D4AA" : "#1A1F2E",
+                color: scanType === "infra" ? "#0B0E14" : "#8B95A8",
+                border: `1px solid ${scanType === "infra" ? "#00D4AA" : "#1E2535"}`,
+                cursor: "pointer",
+              }}>🧠 Infra Intel</button>
             </div>
           </div>
 
@@ -660,11 +909,42 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         </div>
       )}
 
-      {result && (
+      {localResult && (
+        <LocalSecurityResult
+          result={localResult}
+          onAnalyzeWithAI={async () => {
+            if (!localResult) return;
+
+            setAnalyzing(true);
+            updateProgress(20, "Preparing AI analysis payload...");
+
+            const aiPayload = JSON.stringify(localResult, null, 2);
+
+            updateProgress(60, "AI operational analysis in progress...");
+
+            const aiResponse = await onScan(
+              targetHost || "local-security-audit",
+              scanType,
+              aiPayload
+            );
+
+            updateProgress(95, "Preparing AI report...");
+
+            setResult(aiResponse);
+            setLocalResult(null);
+            setAnalyzing(false);
+            setTimeout(() => setProgress(null), 700);
+          }}
+        />
+      )}
+
+      {result && !localResult && (
         <div style={{ marginTop: 24, animation: "slideInRight 0.3s ease" }}>
           <ProfessionalResult result={result} />
         </div>
       )}
+
+      <NetworkVisibility />
     </div>
   );
 };

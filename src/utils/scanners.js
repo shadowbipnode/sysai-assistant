@@ -62,6 +62,21 @@ export async function sshAudit(target, port = 22) {
 }
 
 // ============================================================
+// HTTP HEADERS / FINGERPRINT CHECK
+// ============================================================
+export async function httpHeadersCheck(target, options = {}) {
+  if (isElectron()) {
+    return window.electron.ipcRenderer.invoke('run-scan', {
+      type: 'http-headers',
+      target,
+      options,
+    });
+  }
+
+  throw new Error('HTTP headers check is only available in the Electron app.');
+}
+
+// ============================================================
 // ALL SCANS (run all 3 in parallel)
 // ============================================================
 export async function fullScan(target, options = {}) {
@@ -136,4 +151,62 @@ export function formatTlsResults(result) {
 
   output += `\nHandshake time: ${result.elapsed_ms}ms\n`;
   return output;
+}
+
+// ============================================================
+// NETWORK STATS
+// ============================================================
+export async function networkStats() {
+  if (isElectron()) {
+    return window.electron.ipcRenderer.invoke('run-scan', {
+      type: 'network-stats',
+      target: 'localhost',
+      options: {},
+    });
+  }
+
+  throw new Error('Network stats are only available in the Electron app.');
+}
+
+// ============================================================
+// NETWORK CONNECTIONS
+// ============================================================
+export async function networkConnections() {
+  if (isElectron()) {
+    return window.electron.ipcRenderer.invoke('run-scan', {
+      type: 'network-connections',
+      target: 'localhost',
+      options: {},
+    });
+  }
+
+  throw new Error('Network connections are only available in the Electron app.');
+}
+
+// ADVANCED HTTP PROBE
+export async function advancedHttpProbe(target, options = {}) {
+  return window.electron.ipcRenderer.invoke('run-scan', {
+    type: 'advanced-http-probe',
+    target,
+    options
+  });
+}
+
+
+// SSH AUDIT
+export async function sshAuditProbe(target, port = 22) {
+  return window.electron.ipcRenderer.invoke('run-scan', {
+    type: 'ssh-audit',
+    target,
+    options: { port }
+  });
+}
+
+// SSH BANNER
+export async function sshBanner(target, port = 22) {
+  return window.electron.ipcRenderer.invoke('run-scan', {
+    type: 'ssh-banner',
+    target,
+    options: { port }
+  });
 }
