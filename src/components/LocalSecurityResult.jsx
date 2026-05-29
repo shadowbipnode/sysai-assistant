@@ -15,7 +15,7 @@ const box = {
   marginBottom: 14,
 };
 
-const LocalSecurityResult = ({ result, onAnalyzeWithAI }) => {
+const LocalSecurityResult = ({ result, onAnalyzeWithAI, onAnalyzeRedirectedHost }) => {
   const [selectedService, setSelectedService] = useState(null);
   if (!result) return null;
 
@@ -23,6 +23,36 @@ const LocalSecurityResult = ({ result, onAnalyzeWithAI }) => {
   const stack = result.detectedStack || [];
   const openPorts = result.openPorts || [];
   const serviceMatrix = result.serviceMatrix || [];
+
+  const getServiceRisk = (service) => {
+    const port = String(service.port);
+    return result.exposureRisk?.services?.find(
+      (item) => String(item.port) === port
+    )?.risk || null;
+  };
+
+  const calculateDisplayRisk = (item) => {
+    const base =
+      item.service === "ftp" ? 15 :
+      item.service === "ssh" ? 55 :
+      ["mysql", "postgresql", "mongodb", "mssql", "oracle"].includes(item.service) ? 43 :
+      item.service === "redis" ? 10 :
+      ["smtp", "smtps", "submission"].includes(item.service) ? 72 :
+      ["pop3", "pop3s"].includes(item.service) ? 70 :
+      ["imap", "imaps"].includes(item.service) ? 82 :
+      ["http", "https", "http-alt", "https-alt"].includes(item.service) ? 100 :
+      item.service === "dns" ? 88 :
+      75;
+
+    return {
+      score: base,
+      color:
+        base < 30 ? "#FF4D6A" :
+        base < 55 ? "#F97316" :
+        base < 75 ? "#FBBF24" :
+        "#00D4AA"
+    };
+  };
 
   const highestSeverity =
     findings.find((f) => f.severity === "CRITICAL")?.severity ||
@@ -794,6 +824,26 @@ const LocalSecurityResult = ({ result, onAnalyzeWithAI }) => {
               </div>
             )}
 
+            {getServiceRisk(selectedService)?.signals?.length > 0 && (
+              <div>
+                <strong>Exposure signals:</strong>
+                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                  {getServiceRisk(selectedService).signals.map((signal, index) => (
+                    <div key={index} style={{
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      background: "#131720",
+                      border: "1px solid #263149",
+                      color: "#B8C0D0",
+                      fontSize: 12
+                    }}>
+                      {signal}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <strong>Recommended next steps:</strong><br />
               <span style={{ color: "#8B95A8" }}>
@@ -868,8 +918,12 @@ const LocalSecurityResult = ({ result, onAnalyzeWithAI }) => {
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
         <div style={{ ...box, minWidth: 160, marginBottom: 0 }}>
           <div style={{ color: "#8B95A8", fontSize: 11, fontWeight: 700 }}>RISK</div>
-          <div style={{ color: severityColor[highestSeverity], fontSize: 18, fontWeight: 800 }}>
-            {highestSeverity}
+          <div style={{
+            color: severityColor[result.exposureRisk?.level || highestSeverity],
+            fontSize: 18,
+            fontWeight: 800
+          }}>
+            {result.exposureRisk?.level || highestSeverity}
           </div>
         </div>
 
@@ -904,7 +958,7 @@ const LocalSecurityResult = ({ result, onAnalyzeWithAI }) => {
         </div>
       )}
 
-      {openPorts.length > 0 && (
+      {openPorts.length > 0 && serviceMatrix.length === 0 && (
         <div style={box}>
           <div style={{ color: "#8B95A8", fontSize: 12, fontWeight: 700, marginBottom: 10 }}>Open ports</div>
           <div style={{ display: "grid", gap: 8 }}>
@@ -940,11 +994,26 @@ const LocalSecurityResult = ({ result, onAnalyzeWithAI }) => {
             This host may expose a different service profile.
           </div>
 
-          <div style={{ marginBottom: 10 }}>
+          <div style={{ marginBottom: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={() => onAnalyzeRedirectedHost?.(result.redirectedHostData.host)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 10,
+                border: "1px solid #00D4AA",
+                background: "#00D4AA",
+                color: "#081018",
+                fontWeight: 900,
+                cursor: "pointer"
+              }}
+            >
+              🔍 Analyze redirected host
+            </button>
+
             <button
               onClick={() => {
                 navigator.clipboard.writeText(result.redirectedHostData.host);
-                alert("Redirected host copied. Paste it into the target field and run X-Ray.");
+                alert("Redirected host copied.");
               }}
               style={{
                 padding: "8px 12px",
@@ -960,86 +1029,47 @@ const LocalSecurityResult = ({ result, onAnalyzeWithAI }) => {
             </button>
           </div>
 
-          <div style={{ display: "grid", gap: 8 }}>
-            {(result.redirectedHostData.results || [])
-              .filter((p) => p.status === "open")
-              .map((p) => (
-                <div key={`${p.port}-${p.service}`} style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  background: "#0F131C",
-                  border: "1px solid #1E2535"
-                }}>
-                  <strong>{p.port}</strong>
-                  <span style={{ color: "#8B95A8" }}>{p.service}</span>
-                </div>
-              ))}
-          </div>
-
           {result.redirectedHostData.serviceMatrix?.length > 0 && (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ color: "#38BDF8", fontSize: 12, fontWeight: 800, marginBottom: 8 }}>
-                Redirected host service matrix
+            <div style={{ marginTop: 18 }}>
+              <div style={{
+                color: "#38BDF8",
+                fontSize: 12,
+                fontWeight: 800,
+                marginBottom: 8
+              }}>
+                Redirect target exposure
               </div>
 
-              <div style={{ display: "grid", gap: 8 }}>
-                {result.redirectedHostData.serviceMatrix.map((item) => {
-                  const scopedItem = {
-                    ...item,
-                    hostScope: "redirected",
-                    host: result.redirectedHostData.host
-                  };
+              <div style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8
+              }}>
+                {result.redirectedHostData.serviceMatrix.map((item) => (
+                  <div
+                    key={`redirect-port-${item.port}`}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 999,
+                      background: "#0F131C",
+                      border: "1px solid #1E2535",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#B8C0D0"
+                    }}
+                  >
+                    {item.port}/{item.service}
+                  </div>
+                ))}
+              </div>
 
-                  return (
-                    <React.Fragment key={`redirected-${item.port}-${item.service}`}>
-                      <div
-                        onClick={() => setSelectedService(
-                          selectedService?.hostScope === "redirected" && selectedService?.port === item.port
-                            ? null
-                            : scopedItem
-                        )}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "40px 80px 1fr 120px 1.5fr",
-                          gap: 10,
-                          alignItems: "center",
-                          padding: "10px 12px",
-                          borderRadius: 10,
-                          background: "#0F131C",
-                          border: "1px solid #1E2535",
-                          cursor: "pointer",
-                          boxShadow:
-                            selectedService?.hostScope === "redirected" && selectedService?.port === item.port
-                              ? "0 0 0 1px #38BDF8"
-                              : "none"
-                        }}
-                      >
-                        <span style={{ color: "#38BDF8", fontWeight: 900 }}>
-                          {selectedService?.hostScope === "redirected" && selectedService?.port === item.port ? "▼" : "▶"}
-                        </span>
-                        <strong>{item.port}</strong>
-                        <span>{item.service}</span>
-                        <span style={{
-                          color: severityColor[item.severity] || "#8B95A8",
-                          fontWeight: 800
-                        }}>
-                          {item.severity}
-                        </span>
-                        <span style={{ color: "#8B95A8", fontSize: 12 }}>
-                          redirected host · click for intelligence
-                        </span>
-                      </div>
-
-                      {selectedService?.hostScope === "redirected" && selectedService?.port === item.port && (
-                        <div style={{ marginTop: 8, marginBottom: 8 }}>
-                          {renderServicePanel(scopedItem)}
-                        </div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+              <div style={{
+                marginTop: 12,
+                color: "#8B95A8",
+                fontSize: 12
+              }}>
+                The redirected host exposes a different service profile.
+                Run a dedicated scan against the redirected hostname for full intelligence.
               </div>
             </div>
           )}
@@ -1083,10 +1113,14 @@ const LocalSecurityResult = ({ result, onAnalyzeWithAI }) => {
                   <strong>{item.port}</strong>
                   <span>{item.service}</span>
                   <span style={{
-                    color: severityColor[item.severity] || "#8B95A8",
+                    color:
+                      getServiceRisk(item)?.score < 30 ? "#FF4D6A" :
+                      getServiceRisk(item)?.score < 55 ? "#F97316" :
+                      getServiceRisk(item)?.score < 75 ? "#FBBF24" :
+                      "#00D4AA",
                     fontWeight: 800
                   }}>
-                    {item.severity}
+                    {getServiceRisk(item) ? `${getServiceRisk(item).score}/100` : item.severity}
                   </span>
                   <span style={{ color: "#8B95A8", fontSize: 12 }}>
                     {(item.probes || []).join(", ") || "no chained probe"} · click for intelligence

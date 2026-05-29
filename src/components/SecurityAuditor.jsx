@@ -67,9 +67,14 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
     return output;
   };
 
-  const handleAudit = async () => {
+  const handleAudit = async (targetOverride = null) => {
+    const effectiveTarget =
+      typeof targetOverride === "string" && targetOverride.trim()
+        ? targetOverride
+        : targetHost;
+
     if (mode === 0 && !sourceText.trim()) return;
-    if (mode === 1 && !["secrets", "docker", "permissions", "nginx"].includes(scanType) && !targetHost.trim()) return;
+    if (mode === 1 && !["secrets", "docker", "permissions", "nginx"].includes(scanType) && !effectiveTarget.trim()) return;
     if (mode === 1 && ["secrets", "docker", "permissions", "nginx"].includes(scanType) && !sourceText.trim()) return;
     
     setAnalyzing(true);
@@ -88,33 +93,33 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         let scanResult;
         if (scanType === "ports") {
           updateProgress(20, "Running port scan...");
-          scanResult = await portScan(targetHost, { ports: scanPorts });
+          scanResult = await portScan(effectiveTarget, { ports: scanPorts });
           if (scanResult.success) {
             updateProgress(65, "Parsing port scan results...");
             const output = formatPortResults(scanResult);
             updateProgress(85, "AI analysis in progress. Local models may take longer...");
-            response = await onScan(targetHost, scanType, output);
+            response = await onScan(effectiveTarget, scanType, output);
           } else {
             response = { report: `Errore scan: ${scanResult.error}`, recommendations: "Verifica che il target sia raggiungibile" };
           }
         } else if (scanType === "ssl") {
           updateProgress(20, "Running TLS handshake check...");
-          scanResult = await tlsCheck(targetHost, 443);
+          scanResult = await tlsCheck(effectiveTarget, 443);
           if (scanResult.success) {
             updateProgress(65, "Parsing TLS certificate data...");
             const output = formatTlsCheck(scanResult);
             updateProgress(85, "AI analysis in progress. Local models may take longer...");
-            response = await onScan(targetHost, scanType, output);
+            response = await onScan(effectiveTarget, scanType, output);
           } else {
             response = { report: `Errore TLS: ${scanResult.error}`, recommendations: "Verifica che il target supporti HTTPS" };
           }
         } else if (scanType === "ssh") {
           updateProgress(20, "Running SSH audit...");
-          scanResult = await sshAudit(targetHost, 22);
+          scanResult = await sshAudit(effectiveTarget, 22);
           if (scanResult.success) {
             updateProgress(70, "Parsing SSH audit output...");
             updateProgress(85, "AI analysis in progress. Local models may take longer...");
-            response = await onScan(targetHost, scanType, scanResult.output);
+            response = await onScan(effectiveTarget, scanType, scanResult.output);
           } else {
             response = { report: `Errore SSH: ${scanResult.output}`, recommendations: "Verifica che il target abbia SSH sulla porta 22" };
           }
@@ -422,12 +427,12 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         } else if (scanType === "infra") {
           updateProgress(10, "Running infrastructure discovery...");
 
-          const infraScan = await portScan(targetHost, COMMON_PORTS);
+          const infraScan = await portScan(effectiveTarget, COMMON_PORTS);
 
           updateProgress(60, "Correlating exposure signals...");
 
           const summary = buildInfrastructureSummary(
-            targetHost,
+            effectiveTarget,
             infraScan.results || []
           );
 
@@ -449,14 +454,14 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
             const protocol = hasHttps ? "https" : "http";
 
-            httpData = await httpHeadersCheck(targetHost, {
+            httpData = await httpHeadersCheck(effectiveTarget, {
               protocol
             });
 
             if (!httpData?.success && protocol === 'https') {
               console.log('HTTPS failed, retrying via HTTP...');
 
-              httpData = await httpHeadersCheck(targetHost, {
+              httpData = await httpHeadersCheck(effectiveTarget, {
                 protocol: 'http'
               });
             }
@@ -474,7 +479,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
               console.log('CALLING ADVANCED PROBE');
 
               const advancedProbe = await advancedHttpProbe(
-                targetHost,
+                effectiveTarget,
                 { protocol }
               );
 
@@ -573,7 +578,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           if (summary.openPorts.some((p) => Number(p.port) === 21)) {
             updateProgress(72, "Fingerprinting FTP exposure...");
 
-            ftpData = await ftpProbe(targetHost, 21);
+            ftpData = await ftpProbe(effectiveTarget, 21);
 
             console.log("FTP PROBE RESULT", ftpData);
           }
@@ -581,7 +586,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           if (hasSsh) {
             updateProgress(82, "Fingerprinting SSH service...");
 
-            sshData = await sshBanner(targetHost, 22);
+            sshData = await sshBanner(effectiveTarget, 22);
 
             if (sshData?.success && sshData.banner) {
               findings.push({
@@ -594,7 +599,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
               detectedStack.push("SSH");
             }
 
-            sshAuditData = await sshAuditProbe(targetHost, 22);
+            sshAuditData = await sshAuditProbe(effectiveTarget, 22);
 
             if (sshAuditData?.success && sshAuditData.output) {
               sshAuditData.parsed = parseSshAudit(
@@ -606,7 +611,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           }
 
           if (hasHttps) {
-            tlsData = await tlsCheck(targetHost, 443);
+            tlsData = await tlsCheck(effectiveTarget, 443);
 
             if (
               tlsData?.certificate?.selfSigned
@@ -651,7 +656,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
             const genericResults = await Promise.all(
               genericTargets.map((item) =>
-                tcpServiceProbe(targetHost, item.port, item.service)
+                tcpServiceProbe(effectiveTarget, item.port, item.service)
                   .catch((error) => ({
                     success: false,
                     type: "tcp-service-probe",
@@ -685,6 +690,17 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             };
           }
 
+          if (findings?.some((f) => String(f.title || "").includes("Missing security header"))) {
+            ["80", "443", "8080", "8443"].forEach((port) => {
+              serviceContexts[port] = {
+                ...(serviceContexts[port] || {}),
+                versionDisclosure: Boolean(httpData?.fingerprint?.versions && Object.keys(httpData.fingerprint.versions).length),
+                tlsMissing: port === "80",
+                authWeakOrUnknown: true
+              };
+            });
+          }
+
           Object.entries(serviceProbeData || {}).forEach(([port, probe]) => {
             serviceContexts[port] = {
               versionDisclosure: Boolean(
@@ -699,6 +715,39 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             serviceMatrix,
             serviceContexts
           );
+
+          if (findings?.length) {
+            const findingPenalty = findings.reduce((sum, finding) => {
+              const title = String(finding.title || "").toLowerCase();
+
+              if (title.includes("missing security header")) return sum + 1;
+
+              if (finding.severity === "CRITICAL") return sum + 45;
+              if (finding.severity === "HIGH") return sum + 30;
+              if (finding.severity === "MEDIUM") return sum + 10;
+              if (finding.severity === "LOW") return sum + 4;
+              return sum;
+            }, 0);
+
+            exposureRisk.score = Math.max(0, exposureRisk.score - findingPenalty);
+            const openServiceNames = new Set(
+              serviceMatrix.map((item) => item.service)
+            );
+
+            const onlyWebExposure = [...openServiceNames].every((service) =>
+              ["http", "https", "http-alt", "https-alt"].includes(service)
+            );
+
+            if (onlyWebExposure && exposureRisk.score < 60) {
+              exposureRisk.score = 60;
+            }
+
+            exposureRisk.level =
+              exposureRisk.score < 30 ? "CRITICAL" :
+              exposureRisk.score < 55 ? "HIGH" :
+              exposureRisk.score < 75 ? "MEDIUM" :
+              "LOW";
+          }
 
           const localInfraResult = {
             title: "Infrastructure X-Ray Result",
@@ -1069,6 +1118,10 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
       {localResult && (
         <LocalSecurityResult
           result={localResult}
+          onAnalyzeRedirectedHost={(host) => {
+            setTargetHost(host);
+            handleAudit(host);
+          }}
           onAnalyzeWithAI={async () => {
             if (!localResult) return;
 
