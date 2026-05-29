@@ -210,3 +210,21 @@ export async function sshBanner(target, port = 22) {
     options: { port }
   });
 }
+
+// FTP PROBE
+export async function ftpProbe(target, port = 21) {
+  return window.electron.ipcRenderer.invoke('run-scan', {
+    type: 'ftp-probe',
+    target,
+    options: { port }
+  });
+}
+
+// GENERIC TCP SERVICE PROBE
+export async function tcpServiceProbe(target, port, service) {
+  return window.electron.ipcRenderer.invoke('run-scan', {
+    type: 'tcp-service-probe',
+    target,
+    options: { port, service }
+  });
+}

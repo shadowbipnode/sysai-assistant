@@ -2,7 +2,7 @@ import { useState } from "react";
 import ProfessionalResult from "./ProfessionalResult";
 import LocalSecurityResult from "./LocalSecurityResult";
 import NetworkVisibility from "./NetworkVisibility";
-import { portScan, tlsCheck, sshAudit, httpHeadersCheck, advancedHttpProbe, sshBanner, sshAuditProbe } from "../utils/scanners";
+import { portScan, tlsCheck, sshAudit, httpHeadersCheck, advancedHttpProbe, ftpProbe, sshBanner, sshAuditProbe, tcpServiceProbe } from "../utils/scanners";
 import { detectSecrets } from "../utils/secretDetector";
 import { auditDockerCompose } from "../utils/dockerAudit";
 import { auditPermissions } from "../utils/permissionAudit";
@@ -23,6 +23,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
   const [progress, setProgress] = useState(null);
   const [result, setResult] = useState(null);
   const [localResult, setLocalResult] = useState(null);
+  const [showNetworkVisibility, setShowNetworkVisibility] = useState(false);
 
   const updateProgress = (percent, label) => {
     setProgress({ percent, label });
@@ -439,6 +440,8 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           let tlsData = null;
           let sshData = null;
           let sshAuditData = null;
+          let serviceProbeData = {};
+          let redirectedHostData = null;
 
           if (hasHttps || hasHttp) {
             updateProgress(75, "Fingerprinting HTTP/TLS exposure...");
@@ -478,6 +481,79 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
               httpData.advancedProbe = advancedProbe;
 
+              try {
+                const finalHost = advancedProbe?.finalUrl
+                  ? new URL(advancedProbe.finalUrl).hostname
+                  : "";
+
+                if (
+                  finalHost &&
+                  finalHost !== targetHost &&
+                  finalHost !== targetHost.replace(/^www\./, "")
+                ) {
+                  console.log("REDIRECTED HOST DETECTED", finalHost);
+
+                  const redirectedScan = await portScan(
+                    finalHost,
+                    scanPorts
+                  );
+
+                  const redirectedOpenPorts = redirectedScan?.results?.filter(
+                    (p) => p.status === "open"
+                  ) || [];
+
+                  const redirectedHasHttps = redirectedOpenPorts.some(
+                    (p) => Number(p.port) === 443
+                  );
+
+                  const redirectedHasHttp = redirectedOpenPorts.some(
+                    (p) => Number(p.port) === 80
+                  );
+
+                  let redirectedHttpData = null;
+                  let redirectedTlsData = null;
+
+                  if (redirectedHasHttps || redirectedHasHttp) {
+                    const redirectedProtocol = redirectedHasHttps ? "https" : "http";
+
+                    redirectedHttpData = await httpHeadersCheck(finalHost, {
+                      protocol: redirectedProtocol
+                    });
+
+                    if (redirectedHttpData?.success && redirectedHttpData.headers) {
+                      const redirectedFingerprint = fingerprintHttp(
+                        redirectedHttpData.headers,
+                        finalHost
+                      );
+
+                      redirectedHttpData.fingerprint = redirectedFingerprint;
+
+                      redirectedHttpData.advancedProbe = await advancedHttpProbe(
+                        finalHost,
+                        { protocol: redirectedProtocol }
+                      );
+                    }
+
+                    if (redirectedHasHttps) {
+                      redirectedTlsData = await tlsCheck(finalHost, 443);
+                    }
+                  }
+
+                  redirectedHostData = {
+                    host: finalHost,
+                    results: redirectedScan?.results || [],
+                    openPorts: redirectedOpenPorts,
+                    serviceMatrix: buildServiceMatrix(
+                      redirectedOpenPorts.map((p) => p.port)
+                    ),
+                    httpData: redirectedHttpData,
+                    tlsData: redirectedTlsData
+                  };
+                }
+              } catch (redirectError) {
+                console.warn("Redirect host scan failed", redirectError);
+              }
+
               console.log('ADVANCED PROBE RESULT', advancedProbe);
 
               findings.push(...fingerprint.findings);
@@ -489,6 +565,17 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           }
 
           const hasSsh = summary.openPorts.some((p) => Number(p.port) === 22);
+
+
+          let ftpData = null;
+
+          if (summary.openPorts.some((p) => Number(p.port) === 21)) {
+            updateProgress(72, "Fingerprinting FTP exposure...");
+
+            ftpData = await ftpProbe(targetHost, 21);
+
+            console.log("FTP PROBE RESULT", ftpData);
+          }
 
           if (hasSsh) {
             updateProgress(82, "Fingerprinting SSH service...");
@@ -543,9 +630,43 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             }
           }
 
+          const genericProbeServices = [
+            "telnet", "smtp", "smtps", "submission", "dns", "pop3", "pop3s", "imap", "imaps", "ldap", "ldaps",
+            "mssql", "oracle", "docker", "mysql", "postgresql", "rdp",
+            "vnc", "redis", "prometheus", "elasticsearch", "mongodb",
+            "grafana", "http-alt", "https-alt", "lnd-grpc", "lightning"
+          ];
+
           const serviceMatrix = buildServiceMatrix(
             (summary.openPorts || []).map((p) => p.port)
           );
+
+          const genericTargets = serviceMatrix.filter((item) =>
+            genericProbeServices.includes(item.service)
+          );
+
+          if (genericTargets.length > 0) {
+            updateProgress(88, "Running chained service probes...");
+
+            const genericResults = await Promise.all(
+              genericTargets.map((item) =>
+                tcpServiceProbe(targetHost, item.port, item.service)
+                  .catch((error) => ({
+                    success: false,
+                    type: "tcp-service-probe",
+                    port: item.port,
+                    service: item.service,
+                    error: error.message
+                  }))
+              )
+            );
+
+            serviceProbeData = Object.fromEntries(
+              genericResults.map((item) => [String(item.port), item])
+            );
+
+            console.log("GENERIC SERVICE PROBES", serviceProbeData);
+          }
 
           const localInfraResult = {
             title: "Infrastructure X-Ray Result",
@@ -557,7 +678,10 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             httpData,
             tlsData,
             sshData,
-            sshAuditData
+            ftpData,
+            sshAuditData,
+            serviceProbeData,
+            redirectedHostData
           };
 
           setLocalResult(localInfraResult);
@@ -944,7 +1068,24 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         </div>
       )}
 
-      <NetworkVisibility />
+      <div style={{ marginTop: 24 }}>
+        <button
+          onClick={() => setShowNetworkVisibility((v) => !v)}
+          style={{
+            padding: "12px 18px",
+            borderRadius: 10,
+            border: "1px solid #00D4AA",
+            background: showNetworkVisibility ? "#00D4AA" : "#131720",
+            color: showNetworkVisibility ? "#0B0E14" : "#00D4AA",
+            fontWeight: 800,
+            cursor: "pointer"
+          }}
+        >
+          🌐 {showNetworkVisibility ? "Hide Live Network Visibility" : "Open Live Network Visibility"}
+        </button>
+
+        {showNetworkVisibility && <NetworkVisibility />}
+      </div>
     </div>
   );
 };

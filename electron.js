@@ -303,7 +303,7 @@ function guessService(port) {
   const services = {
     21: 'FTP', 22: 'SSH', 23: 'Telnet', 25: 'SMTP', 53: 'DNS',
     80: 'HTTP', 110: 'POP3', 143: 'IMAP', 443: 'HTTPS', 445: 'SMB',
-    993: 'IMAPS', 995: 'POP3S', 3306: 'MySQL', 5432: 'PostgreSQL',
+    465: 'SMTPS', 587: 'Submission', 993: 'IMAPS', 995: 'POP3S', 3306: 'MySQL', 5432: 'PostgreSQL',
     6379: 'Redis', 8080: 'HTTP-Alt', 8443: 'HTTPS-Alt', 27017: 'MongoDB',
     9735: 'Lightning', 8333: 'Bitcoin', 10009: 'LND-gRPC',
   };
@@ -483,7 +483,7 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
   try {
     switch (type) {
       case 'port-scan': {
-        const ports = options.ports || '21,22,25,53,80,110,143,443,445,993,995,3306,5432,6379,8080,8443,8333,9735,10009,27017';
+        const ports = options.ports || '21,22,25,53,80,110,143,443,445,465,587,993,995,3306,5432,6379,8080,8443,8333,9735,10009,27017';
         const timeout = Math.min(options.timeout || 3000, 10000); // Max 10s
         const results = await portScan(safeTarget, ports, timeout);
         return { success: true, type: 'port-scan', target: safeTarget, results };
@@ -499,6 +499,281 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
         const port = options.port || 22;
         const result = await sshAudit(safeTarget, port);
         return { type: 'ssh-audit', target: safeTarget, ...result };
+      }
+
+      case 'tcp-service-probe': {
+        const net = require('net');
+        const tls = require('tls');
+
+        const port = Number(options.port);
+        const service = options.service || 'unknown';
+
+        const isTlsService = ['smtps', 'imaps', 'pop3s', 'ldaps'].includes(service);
+
+        const result = await new Promise((resolve) => {
+          let socket;
+          let data = '';
+          let resolved = false;
+          let stage = 'connect';
+
+          const finish = (payload) => {
+            if (resolved) return;
+            resolved = true;
+            try { socket.destroy(); } catch (_) {}
+            resolve(payload);
+          };
+
+          const buildPayload = () => {
+            const banner = data.trim().slice(0, 8000);
+
+            const mail = {
+              isMailService: ['smtp', 'smtps', 'submission', 'pop3', 'pop3s', 'imap', 'imaps'].includes(service),
+              implicitTls: ['smtps', 'imaps', 'pop3s'].includes(service),
+              starttls: /STARTTLS|STLS/i.test(banner),
+              auth: [],
+              capabilities: [],
+              tlsProtocol: isTlsService && socket.getProtocol ? socket.getProtocol() : '',
+              tlsCipher: isTlsService && socket.getCipher ? socket.getCipher()?.name || '' : '',
+              serverFamily:
+                /dovecot/i.test(banner) ? 'Dovecot' :
+                /postfix/i.test(banner) ? 'Postfix' :
+                /exim/i.test(banner) ? 'Exim' :
+                /exchange|microsoft/i.test(banner) ? 'Microsoft Exchange' :
+                /courier/i.test(banner) ? 'Courier' :
+                '',
+              version:
+                banner.match(/Exim\s+([0-9.]+)/i)?.[1] ||
+                banner.match(/Postfix\s+([0-9.]+)/i)?.[1] ||
+                banner.match(/Dovecot\s+([0-9.]+)/i)?.[1] ||
+                ''
+            };
+
+            banner.split(/\r?\n/).forEach((line) => {
+              const authLine = line.match(/AUTH[=\s]+(.+)$/i);
+              if (authLine) {
+                authLine[1]
+                  .replace(/^250[-\s]*/i, '')
+                  .trim()
+                  .split(/\s+/)
+                  .forEach((v) => {
+                    const clean = v.replace(/[^A-Z0-9_-]/gi, '');
+                    if (clean && !/^250/i.test(clean) && !mail.auth.includes(clean)) {
+                      mail.auth.push(clean);
+                    }
+                  });
+              }
+            });
+
+            banner.split(/\r?\n/).forEach((line) => {
+              if (/(CAPA|CAPABILITY|STARTTLS|STLS|AUTH|PIPELINING|SIZE|UIDL|TOP|IMAP4|SASL)/i.test(line)) {
+                mail.capabilities.push(line.trim());
+              }
+            });
+
+            return {
+              success: Boolean(banner),
+              type: 'tcp-service-probe',
+              target: safeTarget,
+              port,
+              service,
+              banner,
+              bannerLength: data.length,
+              mail
+            };
+          };
+
+          const send = (cmd) => {
+            try { socket.write(cmd); } catch (_) {}
+          };
+
+          const onConnect = () => {
+            stage = 'connected';
+
+            if (service === 'smtp' || service === 'smtps' || service === 'submission') {
+              setTimeout(() => send('EHLO sysai.local\r\n'), 250);
+              setTimeout(() => finish(buildPayload()), 1600);
+              return;
+            }
+
+            if (service === 'pop3' || service === 'pop3s') {
+              setTimeout(() => send('CAPA\r\n'), 250);
+              setTimeout(() => finish(buildPayload()), 1600);
+              return;
+            }
+
+            if (service === 'imap' || service === 'imaps') {
+              setTimeout(() => send('a001 CAPABILITY\r\n'), 250);
+              setTimeout(() => finish(buildPayload()), 1600);
+              return;
+            }
+
+            if (service === 'redis') {
+              send('PING\r\nINFO server\r\n');
+              setTimeout(() => finish(buildPayload()), 1400);
+              return;
+            }
+
+            if (service === 'postgresql') {
+              setTimeout(() => finish(buildPayload()), 1400);
+              return;
+            }
+
+            if (service === 'mongodb') {
+              setTimeout(() => finish(buildPayload()), 1400);
+              return;
+            }
+
+            if (service === 'mysql') {
+              setTimeout(() => finish(buildPayload()), 1400);
+              return;
+            }
+
+            if (['http-alt', 'grafana', 'prometheus'].includes(service)) {
+              send(`GET / HTTP/1.1\r\nHost: ${safeTarget}\r\nConnection: close\r\n\r\n`);
+              setTimeout(() => finish(buildPayload()), 1600);
+              return;
+            }
+
+            setTimeout(() => finish(buildPayload()), 1400);
+          };
+
+          const socketOptions = {
+            host: safeTarget,
+            port,
+            servername: safeTarget,
+            rejectUnauthorized: false
+          };
+
+          socket = isTlsService
+            ? tls.connect(socketOptions, onConnect)
+            : net.connect({ host: safeTarget, port }, onConnect);
+
+          socket.setTimeout(Math.min(options.timeout || 5000, 10000));
+
+          socket.on('data', (chunk) => {
+            data += chunk.toString('utf8');
+
+            if (!['smtp', 'smtps', 'submission', 'pop3', 'pop3s', 'imap', 'imaps'].includes(service)) {
+              if (data.length > 0) finish(buildPayload());
+            }
+          });
+
+          socket.on('timeout', () => finish({
+            success: false,
+            type: 'tcp-service-probe',
+            target: safeTarget,
+            port,
+            service,
+            error: 'Connection timeout or no banner'
+          }));
+
+          socket.on('error', (error) => finish({
+            success: false,
+            type: 'tcp-service-probe',
+            target: safeTarget,
+            port,
+            service,
+            error: error.message
+          }));
+
+          socket.on('close', () => {
+            if (!resolved) finish(buildPayload());
+          });
+        });
+
+        return result;
+      }
+
+
+      case 'ftp-probe': {
+        const net = require('net');
+        const port = options.port || 21;
+
+        const result = await new Promise((resolve) => {
+          const socket = new net.Socket();
+          let banner = '';
+          let resolved = false;
+
+          const finish = (payload) => {
+            if (resolved) return;
+            resolved = true;
+            socket.destroy();
+            resolve(payload);
+          };
+
+          socket.setTimeout(Math.min(options.timeout || 7000, 12000));
+
+          socket.connect(port, safeTarget, () => {});
+
+          socket.on('data', (data) => {
+            banner += data.toString('utf8');
+
+            if (banner.includes('\n')) {
+              const cleanBanner = banner.trim();
+
+              const lower = cleanBanner.toLowerCase();
+              const software =
+                lower.includes('vsftpd') ? 'vsftpd' :
+                lower.includes('proftpd') ? 'ProFTPD' :
+                lower.includes('pure-ftpd') ? 'Pure-FTPd' :
+                lower.includes('filezilla') ? 'FileZilla Server' :
+                lower.includes('microsoft ftp') ? 'Microsoft FTP' :
+                '';
+
+              const versionMatch = cleanBanner.match(/(?:vsftpd|proftpd|pure-ftpd|filezilla|microsoft ftp)[^0-9]*([0-9][0-9a-zA-Z._-]*)/i);
+
+              finish({
+                success: true,
+                type: 'ftp-probe',
+                target: safeTarget,
+                port,
+                banner: cleanBanner,
+                software,
+                version: versionMatch?.[1] || '',
+                cleartext: true,
+                anonymousChecked: false
+              });
+            }
+          });
+
+          socket.on('timeout', () => {
+            finish({
+              success: false,
+              type: 'ftp-probe',
+              target: safeTarget,
+              port,
+              error: 'Connection timeout'
+            });
+          });
+
+          socket.on('error', (error) => {
+            finish({
+              success: false,
+              type: 'ftp-probe',
+              target: safeTarget,
+              port,
+              error: error.message
+            });
+          });
+
+          socket.on('close', () => {
+            if (!resolved && banner.trim()) {
+              finish({
+                success: true,
+                type: 'ftp-probe',
+                target: safeTarget,
+                port,
+                banner: banner.trim(),
+                software: '',
+                version: '',
+                cleartext: true,
+                anonymousChecked: false
+              });
+            }
+          });
+        });
+
+        return result;
       }
 
       case 'ssh-banner': {

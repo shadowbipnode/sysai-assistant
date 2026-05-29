@@ -3,6 +3,8 @@ export const SERVICE_MAP = {
   22: { service: "ssh", severity: "LOW" },
   23: { service: "telnet", severity: "CRITICAL" },
   25: { service: "smtp", severity: "MEDIUM" },
+  465: { service: "smtps", severity: "MEDIUM" },
+  587: { service: "submission", severity: "MEDIUM" },
   53: { service: "dns", severity: "MEDIUM" },
   80: { service: "http", severity: "LOW" },
   88: { service: "kerberos", severity: "HIGH" },
@@ -102,10 +104,16 @@ export function getRecommendedProbes(service) {
       return ["windows-domain-exposure-analysis"];
 
     case "ftp":
-    case "smtp":
-    case "imap":
-    case "pop3":
       return ["legacy-service-exposure-analysis"];
+
+    case "smtp":
+    case "smtps":
+    case "submission":
+    case "imap":
+    case "imaps":
+    case "pop3":
+    case "pop3s":
+      return ["mail-service-intelligence"];
 
     default:
       return [];
