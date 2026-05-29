@@ -833,6 +833,38 @@ const LocalSecurityResult = ({ result, onAnalyzeWithAI }) => {
         </button>
       </div>
 
+      {result.exposureRisk && (
+        <div style={{
+          ...box,
+          border: "1px solid #00D4AA",
+          background: "linear-gradient(180deg, #101826 0%, #0B0E14 100%)"
+        }}>
+          <div style={{ color: "#8B95A8", fontSize: 12, fontWeight: 800 }}>
+            UNIVERSAL EXPOSURE SCORE
+          </div>
+
+          <div style={{
+            marginTop: 8,
+            fontSize: 34,
+            fontWeight: 900,
+            color:
+              result.exposureRisk.score < 30 ? "#FF4D6A" :
+              result.exposureRisk.score < 55 ? "#F97316" :
+              result.exposureRisk.score < 75 ? "#FBBF24" :
+              "#00D4AA"
+          }}>
+            {result.exposureRisk.score}/100
+          </div>
+
+          <div style={{
+            color: severityColor[result.exposureRisk.level] || "#8B95A8",
+            fontWeight: 900
+          }}>
+            {result.exposureRisk.level}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
         <div style={{ ...box, minWidth: 160, marginBottom: 0 }}>
           <div style={{ color: "#8B95A8", fontSize: 11, fontWeight: 700 }}>RISK</div>

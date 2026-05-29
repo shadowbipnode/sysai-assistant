@@ -11,6 +11,7 @@ import { buildInfrastructureSummary, COMMON_PORTS } from "../utils/infrastructur
 import { fingerprintHttp } from "../utils/httpFingerprint";
 import { buildServiceMatrix } from "../utils/serviceOrchestrator";
 import { parseSshAudit } from "../utils/sshAuditParser";
+import { calculateGlobalRisk } from "../utils/exposureRiskEngine";
 
 const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
   const [mode, setMode] = useState(0);
@@ -668,6 +669,37 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             console.log("GENERIC SERVICE PROBES", serviceProbeData);
           }
 
+          const serviceContexts = {};
+
+          if (sshAuditData?.parsed?.score !== undefined) {
+            serviceContexts["22"] = {
+              sshScore: sshAuditData.parsed.score,
+              versionDisclosure: Boolean(sshData?.software)
+            };
+          }
+
+          if (ftpData?.success) {
+            serviceContexts["21"] = {
+              versionDisclosure: Boolean(ftpData.version || ftpData.software),
+              tlsMissing: true
+            };
+          }
+
+          Object.entries(serviceProbeData || {}).forEach(([port, probe]) => {
+            serviceContexts[port] = {
+              versionDisclosure: Boolean(
+                probe?.banner?.match(/[0-9]+\.[0-9]+/)
+              ),
+              authWeakOrUnknown: !probe?.mail?.auth?.length,
+              tlsMissing: probe?.mail?.isMailService && !probe?.mail?.starttls && !probe?.mail?.implicitTls
+            };
+          });
+
+          const exposureRisk = calculateGlobalRisk(
+            serviceMatrix,
+            serviceContexts
+          );
+
           const localInfraResult = {
             title: "Infrastructure X-Ray Result",
             findings,
@@ -681,7 +713,8 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             ftpData,
             sshAuditData,
             serviceProbeData,
-            redirectedHostData
+            redirectedHostData,
+            exposureRisk
           };
 
           setLocalResult(localInfraResult);
