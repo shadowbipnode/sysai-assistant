@@ -1,13 +1,13 @@
 {
   "name": "sysai-assistant",
-  "version": "1.6.0-beta",
+  "version": "1.7.0-beta",
   "private": true,
   "author": {
     "name": "SysAI Team",
     "email": "support@sysai.com"
   },
   "homepage": "https://github.com/shadowbipnode/sysai-assistant",
-  "description": "AI-Powered Linux Sysadmin Toolkit",
+  "description": "AI-powered operational infrastructure toolkit",
   "main": "electron.js",
   "scripts": {
     "dev": "vite",

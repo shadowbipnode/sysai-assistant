@@ -273,6 +273,62 @@ Includes built-in scanners:
 * Port Scanner
 * TLS/SSL Checker
 * SSH Audit
+* Infrastructure Intelligence target scanner
+* Local-first Secret Detector
+* Filesystem and Permission Audit
+* Docker Compose and reverse proxy static audits
+
+Infrastructure Intelligence provides local-first exposure discovery for a target host:
+
+* Service Matrix for open ports and service families
+* Service Intelligence panels for HTTP, TLS, SSH, FTP, mail, databases, Docker, monitoring and high-value services
+* Attack Surface Summary with web, mail, remote access, database and detected admin panel counts
+* Exposure Risk Engine that weighs service type, authentication posture, TLS posture, admin interfaces, database exposure, Docker exposure, metadata leaks and version disclosure
+* HTTP fingerprinting, redirect-host analysis, TLS inspection and security header review
+* Reverse proxy intelligence for nginx, Apache, Caddy, Traefik and HAProxy indicators
+* CDN/WAF indicators including Cloudflare, Fastly, Akamai and Sucuri-style signals
+* Admin panel intelligence for Grafana, Prometheus, Portainer, phpMyAdmin, Nextcloud, LNbits, WordPress Admin and generic login portals
+* Database intelligence for MySQL/MariaDB, PostgreSQL, Redis, MongoDB and Elasticsearch
+* Docker API exposure intelligence for ports 2375 and 2376
+* Recommended hardening guidance and exposure signals for each detected service
+* Optional explicit AI analysis using a sanitized infrastructure payload with findings, service matrix, exposure score, attack surface summary and recommendations
+
+Database Intelligence attempts safe banner or protocol-level collection where possible. It classifies the database family, extracts versions when exposed, evaluates authentication visibility, highlights unauthenticated Redis responses, and recommends private networking, allowlists and service-level authentication.
+
+Docker Exposure Intelligence treats reachable Docker APIs as one of the highest-risk exposure classes. It checks HTTP API reachability, Docker version metadata when available, TLS presence on 2376, and remote administration risk.
+
+Admin Panel Intelligence counts actual detected panels from probes and fingerprints rather than assuming every alternate web port is an admin surface. Each detected panel shows platform, confidence, authentication indicators, administrative exposure assessment and operational recommendations.
+
+Reverse Proxy Intelligence identifies reverse proxy family and version disclosure when available, separates CDN/WAF indicators, evaluates metadata disclosure, and recommends practical hardening for public web edges.
+
+Remote scan mode is separated from local pasted audits so live target scans do not show local-only tools. Target normalization accepts hostnames and full URLs such as `example.com`, `www.example.com`, `https://example.com` and `https://example.com/path`.
+
+Local-first audit tools run on pasted content in the workspace:
+
+* Secret Detector flags common config secrets, provider tokens, private keys, credential URLs, Docker environment secrets and high-entropy values while masking detected evidence in results
+* Permission Audit parses `ls -la`, `find` and sudoers-style snippets for world-writable paths, weak SSH permissions, sensitive readable files, risky SUID/SGID bits, Docker socket access and broad or passwordless sudo rules
+* Docker Compose Audit highlights privileged containers, Docker socket mounts, exposed databases and hardening gaps
+* Proxy Audit reviews nginx, Caddy and reverse proxy configuration patterns locally
+
+Local audit inputs are not sent to AI providers by default. Optional AI analysis is explicit, and generated CSR/private key material, local secrets and sensitive pasted content are not included in Infrastructure Intelligence AI payloads.
+
+Security results include operational runbook copy/export actions. Generated runbooks include symptoms, likely cause, findings, verification commands, safe remediation, rollback notes and prevention guidance.
+
+---
+
+### 🔐 CSR Generator
+
+Generate certificate signing requests and private keys locally with:
+
+* RSA 2048
+* RSA 4096
+* ECDSA P-256
+* ECDSA P-384
+* Common Name, organization, organizational unit, city, state, country and email fields
+* SAN DNS and SAN IP entries with basic validation
+* copy/export for the private key, CSR and equivalent OpenSSL command
+
+The CSR Generator does not use AI providers and does not transmit generated keys or CSR data over the network. Private keys should be stored securely with restricted file permissions.
 
 ---
 
@@ -293,6 +349,16 @@ Recent UI improvements include:
 * improved hierarchy and spacing
 * refined command/result rendering
 * infrastructure-oriented visual design
+* keyboard command palette for primary tools, History, Settings, Security & Exposure Intelligence and CSR Generator
+* context-linked History entries for meaningful provider and local security results
+
+Keyboard workflow:
+
+* Open the command palette from the workspace palette button
+* Search for core tools, Security & Exposure Intelligence, CSR Generator, History or Settings
+* Press Enter to open the first match or Esc to close the palette
+
+Workflow continuity keeps relevant operational context attached to History entries and carries current findings into optional AI analysis and runbook generation. Local-sensitive inputs such as pasted secrets are redacted from History and unrelated workflows.
 
 ---
 
@@ -305,6 +371,8 @@ Supported UI and response languages:
 * Français
 * Deutsch
 * Español
+
+User-visible UI strings are expected to be available in all supported languages.
 
 ---
 
@@ -492,7 +560,7 @@ npm run electron:build:all
 
 ## Completed
 
-* [x] 7 operational AI tools
+* [x] workflow-oriented operational and local security tools
 * [x] environment-aware diagnostics
 * [x] structured operational output
 * [x] rollback + verification workflows
@@ -512,6 +580,11 @@ npm run electron:build:all
 * [x] lint workflow
 * [x] export to `.md`, `.sh`, `.py`, `.ps1`, `.js`
 * [x] command palette MVP
+* [x] local-first Secret Detector
+* [x] filesystem and permission audit
+* [x] Infrastructure Intelligence target scanner
+* [x] operational runbook export
+* [x] local CSR/private key generator
 * [x] operational trust semantics
 * [x] evidence vs assumptions separation
 * [x] remediation safety scoring
@@ -546,4 +619,3 @@ MIT
 <p align="center">
 Built with ⚡ for infrastructure operators, self-hosters and security workflows.
 </p>
-

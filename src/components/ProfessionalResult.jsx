@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { buildOperationalRunbook, exportRunbook } from "../utils/runbookGenerator";
 
 const severityColors = {
   LOW: "#00D4AA",
@@ -228,13 +229,20 @@ const textSection = (text) => text ? (
   <p style={{ fontSize: 14, color: "#B8C0D0", whiteSpace: "pre-wrap", margin: 0, lineHeight: 1.6 }}>{text}</p>
 ) : null;
 
-const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = false }) => {
+const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = false, t = null }) => {
   const [collapseSignal, setCollapseSignal] = useState(null);
+  const [copiedRunbook, setCopiedRunbook] = useState(false);
 
   if (!result) return null;
 
   const collapseAll = () => setCollapseSignal({ mode: "collapse", ts: Date.now() });
   const expandAll = () => setCollapseSignal({ mode: "expand", ts: Date.now() });
+  const actionLabels = t?.resultActions || {
+    exportReport: "Export .md",
+    copyRunbook: "Copy runbook",
+    copiedRunbook: "Runbook copied",
+    exportRunbook: "Export runbook",
+  };
 
   const severity = first(result.severity, result.risk_level, result.risk, result.destructive ? "HIGH" : null);
   const normalizedSeverity = typeof severity === "string" ? severity.toUpperCase() : severity;
@@ -374,7 +382,43 @@ const ProfessionalResult = ({ result, compact = false, hidePrimaryArtifact = fal
               cursor: "pointer",
             }}
           >
-            ⬇ Export .md
+            ⬇ {actionLabels.exportReport}
+          </button>
+          <button
+            onClick={async () => {
+              await navigator.clipboard.writeText(buildOperationalRunbook(result));
+              setCopiedRunbook(true);
+              setTimeout(() => setCopiedRunbook(false), 1600);
+            }}
+            style={{
+              background: "#1A1F2E",
+              border: "1px solid #38BDF855",
+              borderRadius: 8,
+              color: "#38BDF8",
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              marginLeft: 8,
+            }}
+          >
+            📋 {copiedRunbook ? actionLabels.copiedRunbook : actionLabels.copyRunbook}
+          </button>
+          <button
+            onClick={() => exportRunbook(result)}
+            style={{
+              background: "#1A1F2E",
+              border: "1px solid #00D4AA55",
+              borderRadius: 8,
+              color: "#00D4AA",
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              marginLeft: 8,
+            }}
+          >
+            ⬇ {actionLabels.exportRunbook}
           </button>
         </div>
       )}

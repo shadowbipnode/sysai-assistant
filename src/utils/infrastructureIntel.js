@@ -4,7 +4,8 @@ function finding(title, severity, evidence, remediation) {
 
 const COMMON_PORTS = [
   21, 22, 25, 53, 80, 110, 143, 443, 465, 587, 993, 995,
-  3000, 3306, 5432, 6379, 8000, 8080, 8443, 9000, 9090, 9200
+  2375, 2376, 3000, 3306, 5432, 6379, 8000, 8080, 8443, 9000, 9090,
+  9200, 9735, 10009, 27017
 ];
 
 const SERVICE_HINTS = {
@@ -14,6 +15,8 @@ const SERVICE_HINTS = {
   53: "DNS",
   80: "HTTP",
   443: "HTTPS",
+  2375: "Docker API",
+  2376: "Docker API over TLS",
   3000: "Grafana / Node app / dev service",
   3306: "MySQL / MariaDB",
   5432: "PostgreSQL",
@@ -22,7 +25,10 @@ const SERVICE_HINTS = {
   8443: "HTTPS alternate",
   9000: "MinIO / Portainer / app service",
   9090: "Prometheus",
-  9200: "Elasticsearch"
+  9200: "Elasticsearch",
+  9735: "Lightning Network",
+  10009: "LND gRPC",
+  27017: "MongoDB"
 };
 
 export function buildInfrastructureSummary(target, scanResults = []) {
@@ -33,10 +39,10 @@ export function buildInfrastructureSummary(target, scanResults = []) {
     const port = Number(item.port);
     const service = SERVICE_HINTS[port] || item.service || "unknown service";
 
-    if ([3306, 5432, 6379, 9200].includes(port)) {
+    if ([2375, 2376, 3306, 5432, 6379, 9200, 10009, 27017].includes(port)) {
       findings.push(finding(
         `Sensitive service exposed on port ${port}`,
-        "HIGH",
+        [2375, 2376, 6379, 10009].includes(port) ? "CRITICAL" : "HIGH",
         `${service} appears reachable on ${target}:${port}.`,
         "Restrict this service to localhost, VPN, firewall allowlists or private networks."
       ));

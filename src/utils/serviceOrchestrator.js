@@ -24,6 +24,7 @@ export const SERVICE_MAP = {
   1433: { service: "mssql", severity: "HIGH" },
   1521: { service: "oracle", severity: "HIGH" },
   2375: { service: "docker", severity: "CRITICAL" },
+  2376: { service: "docker", severity: "CRITICAL" },
   3000: { service: "grafana", severity: "HIGH" },
   3306: { service: "mysql", severity: "HIGH" },
   3389: { service: "rdp", severity: "HIGH" },

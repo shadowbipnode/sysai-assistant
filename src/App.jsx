@@ -12,6 +12,7 @@ import Troubleshooter from "./components/Troubleshooter";
 import ScriptBuilder from "./components/ScriptBuilder";
 import SecurityAuditor from "./components/SecurityAuditor";
 import ExplainMode from "./components/ExplainMode";
+import CsrGenerator from "./components/CsrGenerator";
 import { buildExplainPrompt } from "./utils/aiProviders";
 import { useLicense } from './hooks/useLicense';
 import { PRO_TOOLS } from './utils/license';
@@ -661,8 +662,8 @@ function App() {
   const updateStatusText = updateAvailable ? "Update available" : "Up to date";
   const updateStatusColor = updateAvailable ? "#F59E0B" : "#22C55E";
   const productSubtitle = lang === "it"
-    ? "AI toolkit locale per Linux, sicurezza e infrastruttura"
-    : "Local-first AI toolkit for Linux, security and infrastructure";
+    ? "AI toolkit locale per sicurezza, infrastruttura e operations"
+    : "Local-first AI toolkit for security, infrastructure and operations";
 
   // ============================================================
   // RENDER
@@ -704,6 +705,7 @@ function App() {
         open={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
         onNavigate={(nextPage) => setPage(nextPage)}
+        t={t}
       />
 
       <nav className="sysai-topbar" style={{
@@ -1050,8 +1052,23 @@ function App() {
             t={t} 
             onAudit={handleSecurityAudit} 
             onScan={handleSecurityScan} 
+            onLocalResult={({ scanType, input, output }) => {
+              history.addEntry({
+                tool: "securityAuditor",
+                toolName: t.modes.securityAuditor.name,
+                toolIcon: t.modes.securityAuditor.icon,
+                input,
+                output,
+                provider: "local",
+                model: scanType,
+              });
+            }}
             onBack={() => setPage("home")} 
           />
+        )}
+
+        {page === "csrGenerator" && (
+          <CsrGenerator t={t} onBack={() => setPage("home")} />
         )}
 
         {page === "operationalContext" && (

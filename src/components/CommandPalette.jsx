@@ -1,20 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 
-const CommandPalette = ({ open, onClose, onNavigate }) => {
+const CommandPalette = ({ open, onClose, onNavigate, t }) => {
   const [query, setQuery] = useState("");
 
   const commands = useMemo(() => [
-    { id: "home", label: "Home", description: "Return to main workspace", icon: "🏠" },
-    { id: "logAnalyzer", label: "Log Analyzer", description: "Analyze logs and failures", icon: "📋" },
-    { id: "commandCrafter", label: "Command Crafter", description: "Generate safe Linux commands", icon: "⌨️" },
-    { id: "explainMode", label: "Explain Mode", description: "Explain commands and scripts", icon: "🔍" },
-    { id: "configGenerator", label: "Config Generator", description: "Generate infrastructure configs", icon: "⚙️" },
-    { id: "troubleshooter", label: "Troubleshooter", description: "Guided operational diagnostics", icon: "🔧" },
-    { id: "scriptBuilder", label: "Script Builder", description: "Generate scripts with safeguards", icon: "📜" },
-    { id: "securityAuditor", label: "Security Auditor", description: "Audit configs and remote exposure", icon: "🛡️" },
-    { id: "history", label: "History", description: "Review previous outputs", icon: "🕘" },
-    { id: "settings", label: "Settings", description: "Providers, models and preferences", icon: "⚙️" },
-  ], []);
+    { id: "home", label: t.home, description: t.commandPalette.descriptions.home, icon: "🏠" },
+    ...Object.entries(t.modes).map(([id, mode]) => ({
+      id,
+      label: mode.name,
+      description: mode.desc,
+      icon: mode.icon,
+    })),
+    { id: "history", label: t.history, description: t.commandPalette.descriptions.history, icon: "🕘" },
+    { id: "settings", label: t.settings, description: t.commandPalette.descriptions.settings, icon: "⚙️" },
+  ], [t]);
 
   const filtered = commands.filter((cmd) => {
     const q = query.trim().toLowerCase();
@@ -79,7 +78,7 @@ const CommandPalette = ({ open, onClose, onNavigate }) => {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search commands, tools, settings..."
+            placeholder={t.commandPalette.placeholder}
             style={{
               width: "100%",
               background: "#131720",
@@ -92,14 +91,14 @@ const CommandPalette = ({ open, onClose, onNavigate }) => {
             }}
           />
           <div style={{ marginTop: 8, color: "#8B95A8", fontSize: 11 }}>
-            Press Enter to open first result · Esc to close
+            {t.commandPalette.hint}
           </div>
         </div>
 
         <div style={{ maxHeight: 420, overflowY: "auto", padding: 8 }}>
           {filtered.length === 0 ? (
             <div style={{ padding: 18, color: "#8B95A8", fontSize: 13 }}>
-              No matching command found.
+              {t.commandPalette.empty}
             </div>
           ) : filtered.map((cmd, index) => (
             <button

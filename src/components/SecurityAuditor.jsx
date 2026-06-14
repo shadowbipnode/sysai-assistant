@@ -11,9 +11,11 @@ import { buildInfrastructureSummary, COMMON_PORTS } from "../utils/infrastructur
 import { fingerprintHttp } from "../utils/httpFingerprint";
 import { buildServiceMatrix } from "../utils/serviceOrchestrator";
 import { parseSshAudit } from "../utils/sshAuditParser";
-import { calculateGlobalRisk } from "../utils/exposureRiskEngine";
+import { buildAttackSurfaceSummary, calculateGlobalRisk } from "../utils/exposureRiskEngine";
 
-const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
+const localTextScanTypes = ["secrets", "docker", "permissions", "nginx"];
+
+const SecurityAuditor = ({ t, onAudit, onScan, onLocalResult, onBack }) => {
   const [mode, setMode] = useState(0);
   const [inputType, setInputType] = useState(0);
   const [sourceText, setSourceText] = useState("");
@@ -28,6 +30,21 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
   const updateProgress = (percent, label) => {
     setProgress({ percent, label });
+  };
+
+  const changeScanType = (nextType) => {
+    setScanType(nextType);
+    setResult(null);
+    setLocalResult(null);
+    setProgress(null);
+  };
+
+  const changeMode = (nextMode) => {
+    setMode(nextMode);
+    setScanType(nextMode === 1 ? "ports" : nextMode === 2 ? "secrets" : scanType);
+    setResult(null);
+    setLocalResult(null);
+    setProgress(null);
   };
 
   const formatTlsCheck = (result) => {
@@ -67,15 +84,303 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
     return output;
   };
 
+  const devLog = (...args) => {
+    if (import.meta.env.DEV) {
+      console.log(...args);
+    }
+  };
+
+  const normalizeScanTarget = (value = "") => {
+    const raw = String(value || "").trim();
+
+    if (!raw) return "";
+
+    try {
+      const withProtocol = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw)
+        ? raw
+        : `http://${raw}`;
+      const parsed = new URL(withProtocol);
+      return parsed.hostname || raw;
+    } catch {
+      return raw
+        .replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, "")
+        .split("/")[0]
+        .split("?")[0]
+        .split("#")[0]
+        .trim();
+    }
+  };
+
+  const sanitizeInfrastructurePayload = (scanResult) => {
+    const summarizeWebIntel = (webIntelData = {}) => Object.fromEntries(
+      Object.entries(webIntelData).map(([port, intel]) => [port, {
+        port: intel?.port,
+        service: intel?.service,
+        url: intel?.url,
+        status: intel?.status,
+        title: intel?.advancedProbe?.title || "",
+        technologies: intel?.fingerprint?.technologies || [],
+        findings: (intel?.fingerprint?.findings || []).map((finding) => ({
+          title: finding.title,
+          severity: finding.severity,
+          evidence: finding.evidence,
+          remediation: finding.remediation,
+        })),
+        securityHeaders: intel?.fingerprint?.metadata?.securityHeaders,
+        adminPanels: intel?.fingerprint?.metadata?.adminPanels || [],
+        redirectChain: intel?.advancedProbe?.redirectChain || [],
+      }])
+    );
+
+    return {
+      title: scanResult.title,
+      target: normalizeScanTarget(targetHost),
+      findings: (scanResult.findings || []).map((finding) => ({
+        title: finding.title,
+        severity: finding.severity,
+        evidence: finding.evidence,
+        remediation: finding.remediation,
+      })),
+      detectedStack: scanResult.detectedStack || [],
+      openPorts: scanResult.openPorts || [],
+      serviceMatrix: scanResult.serviceMatrix || [],
+      exposureRisk: scanResult.exposureRisk,
+      attackSurfaceSummary: scanResult.attackSurfaceSummary,
+      recommendations: (scanResult.findings || []).map((finding) => finding.remediation).filter(Boolean),
+      webIntelData: summarizeWebIntel(scanResult.webIntelData),
+      redirectedHostData: scanResult.redirectedHostData ? {
+        host: scanResult.redirectedHostData.host,
+        openPorts: scanResult.redirectedHostData.openPorts || [],
+        serviceMatrix: scanResult.redirectedHostData.serviceMatrix || [],
+        httpData: scanResult.redirectedHostData.httpData ? {
+          url: scanResult.redirectedHostData.httpData.url,
+          status: scanResult.redirectedHostData.httpData.status,
+          title: scanResult.redirectedHostData.httpData.advancedProbe?.title || "",
+          technologies: scanResult.redirectedHostData.httpData.fingerprint?.technologies || [],
+        } : null,
+      } : null,
+    };
+  };
+
+
+  const addFindingOnce = (findings, finding) => {
+    const key = String(finding.title || "").toLowerCase();
+    if (!key) return;
+    if (!findings.some((item) => String(item.title || "").toLowerCase() === key)) {
+      findings.push(finding);
+    }
+  };
+
+  const hasService = (serviceMatrix, services) =>
+    serviceMatrix.some((item) => services.includes(item.service));
+
+  const generateInfrastructureFindings = ({
+    target,
+    serviceMatrix,
+    findings,
+    webIntelData,
+    serviceProbeData,
+    sshAuditData,
+    tlsData
+  }) => {
+    const mailServices = ["smtp", "smtps", "submission", "imap", "imaps", "pop3", "pop3s"];
+    const databaseServices = ["mysql", "postgresql", "redis", "mongodb", "mssql", "oracle", "elasticsearch"];
+    const remoteServices = ["ssh", "rdp", "vnc", "telnet", "ftp"];
+    const legacyServices = ["ftp", "telnet", "pop3", "imap"];
+
+    if (hasService(serviceMatrix, mailServices)) {
+      addFindingOnce(findings, {
+        title: "Public mail infrastructure",
+        severity: "MEDIUM",
+        evidence: `Mail services are reachable on ${target}: ${serviceMatrix.filter((item) => mailServices.includes(item.service)).map((item) => `${item.service}/${item.port}`).join(", ")}.`,
+        remediation: "Confirm this host is intended to receive or relay mail, require TLS where supported, and restrict administrative mail interfaces."
+      });
+    }
+
+    if (hasService(serviceMatrix, databaseServices)) {
+      addFindingOnce(findings, {
+        title: "Public database exposure",
+        severity: "HIGH",
+        evidence: `Database-oriented services are reachable on ${target}: ${serviceMatrix.filter((item) => databaseServices.includes(item.service)).map((item) => `${item.service}/${item.port}`).join(", ")}.`,
+        remediation: "Move databases behind private networking, VPN, firewall allowlists, or service mesh controls before accepting production traffic."
+      });
+    }
+
+    if (hasService(serviceMatrix, remoteServices)) {
+      addFindingOnce(findings, {
+        title: "Remote administration exposure",
+        severity: hasService(serviceMatrix, ["telnet", "rdp", "vnc"]) ? "HIGH" : "MEDIUM",
+        evidence: `Remote access services are reachable on ${target}: ${serviceMatrix.filter((item) => remoteServices.includes(item.service)).map((item) => `${item.service}/${item.port}`).join(", ")}.`,
+        remediation: "Restrict remote administration to VPN, bastion hosts, allowlisted source IPs, and strong authentication."
+      });
+    }
+
+    const webIntelValues = Object.values(webIntelData || {});
+    const wordpressPorts = webIntelValues
+      .filter((intel) =>
+        intel?.advancedProbe?.fingerprint?.wordpress ||
+        (intel?.fingerprint?.technologies || []).some((item) => /wordpress/i.test(item))
+      )
+      .map((intel) => intel.port)
+      .filter(Boolean);
+
+    if (wordpressPorts.length > 0) {
+      addFindingOnce(findings, {
+        title: "WordPress detected",
+        severity: "MEDIUM",
+        evidence: `WordPress indicators were detected on port(s): ${[...new Set(wordpressPorts)].join(", ")}.`,
+        remediation: "Keep WordPress core, plugins and themes patched, reduce version disclosure, and protect wp-admin/wp-login with MFA or access restrictions."
+      });
+    }
+
+    const adminPorts = webIntelValues
+      .filter((intel) =>
+        intel?.advancedProbe?.fingerprint?.loginPanel ||
+        intel?.advancedProbe?.fingerprint?.adminPath ||
+        intel?.advancedProbe?.fingerprint?.phpmyadmin ||
+        intel?.advancedProbe?.adminHints?.length ||
+        (intel?.fingerprint?.metadata?.adminPanels || []).length ||
+        (intel?.fingerprint?.technologies || []).some((item) => /grafana|prometheus|phpmyadmin|portainer|nextcloud|lnbits/i.test(item))
+      )
+      .map((intel) => intel.port)
+      .filter(Boolean);
+
+    if (adminPorts.length > 0) {
+      addFindingOnce(findings, {
+        title: "Admin panel detected",
+        severity: "MEDIUM",
+        evidence: `Login or administrative panel indicators were detected on port(s): ${[...new Set(adminPorts)].join(", ")}.`,
+        remediation: "Place administrative panels behind SSO, MFA, VPN, IP allowlists, or a private management network."
+      });
+    }
+
+    Object.values(serviceProbeData || {}).forEach((probe) => {
+      if (probe?.database?.isDatabase) {
+        const vendor = probe.database.vendor || probe.service;
+        const auth = probe.database.auth || "unknown";
+        const unauthenticated = auth === "not-required-or-ping-allowed" || probe.database.redisPongWithoutAuth || probe.database.redisInfoAvailable;
+        addFindingOnce(findings, {
+          title: `${vendor} database exposure`,
+          severity: unauthenticated ? "CRITICAL" : "HIGH",
+          evidence: `${vendor} is reachable on ${target}:${probe.port}${probe.database.version ? ` and discloses version ${probe.database.version}` : ""}. Authentication posture: ${auth}.`,
+          remediation: "Keep database listeners on private networks, enforce authentication, and allowlist only trusted application hosts."
+        });
+      }
+
+      if (probe?.docker?.apiReachable) {
+        addFindingOnce(findings, {
+          title: "Docker remote administration exposure",
+          severity: "CRITICAL",
+          evidence: `Docker API is reachable on ${target}:${probe.port}${probe.docker.tlsPresent ? ` with TLS ${probe.docker.tlsProtocol || "enabled"}` : " without confirmed TLS"}.`,
+          remediation: "Disable public Docker API exposure. Bind dockerd to localhost or a private management network and require mutual TLS for any remote administration."
+        });
+      }
+    });
+
+    if (hasService(serviceMatrix, legacyServices)) {
+      addFindingOnce(findings, {
+        title: "Legacy service detected",
+        severity: hasService(serviceMatrix, ["telnet", "ftp"]) ? "HIGH" : "MEDIUM",
+        evidence: `Legacy services are reachable: ${serviceMatrix.filter((item) => legacyServices.includes(item.service)).map((item) => `${item.service}/${item.port}`).join(", ")}.`,
+        remediation: "Replace cleartext or legacy protocols with modern TLS-protected alternatives and disable unused listeners."
+      });
+    }
+
+    const weakCryptoEvidence = [];
+    if (sshAuditData?.parsed?.failures?.length) {
+      weakCryptoEvidence.push(`SSH audit reported ${sshAuditData.parsed.failures.length} crypto failure(s).`);
+    }
+    if (sshAuditData?.parsed?.score !== undefined && sshAuditData.parsed.score < 70) {
+      weakCryptoEvidence.push(`SSH crypto score is ${sshAuditData.parsed.score}/100.`);
+    }
+    if (tlsData?.warnings?.length) {
+      weakCryptoEvidence.push(`TLS warnings: ${tlsData.warnings.join(", ")}.`);
+    }
+    Object.values(serviceProbeData || {}).forEach((probe) => {
+      if (probe?.mail?.starttls === false && probe?.mail?.implicitTls === false) {
+        weakCryptoEvidence.push(`Mail service on port ${probe.port} did not advertise TLS.`);
+      }
+    });
+
+    if (weakCryptoEvidence.length > 0) {
+      addFindingOnce(findings, {
+        title: "Weak crypto detected",
+        severity: "MEDIUM",
+        evidence: weakCryptoEvidence.join(" "),
+        remediation: "Remove legacy algorithms, require TLS for supported protocols, and re-test exposed services after configuration changes."
+      });
+    }
+  };
+
+  const getWebProbeConfig = (service, port) => {
+    if (["https", "https-alt"].includes(service)) return { protocol: "https", port };
+    if (service === "docker" && Number(port) === 2376) return { protocol: "https", port };
+    if (["http", "http-alt", "grafana", "prometheus", "docker", "elasticsearch"].includes(service)) {
+      return { protocol: "http", port };
+    }
+    return null;
+  };
+
+  const buildHttpIntel = async (host, service, port) => {
+    const config = getWebProbeConfig(service, Number(port));
+    if (!config) return null;
+
+    let headersResult = await httpHeadersCheck(host, config);
+
+    if (!headersResult?.success && config.protocol === "https") {
+      headersResult = await httpHeadersCheck(host, {
+        protocol: "http",
+        port
+      });
+    }
+
+    if (!headersResult?.success || !headersResult.headers) {
+      return headersResult || null;
+    }
+
+    const advancedProbe = await advancedHttpProbe(host, {
+      protocol: headersResult.url?.startsWith("https:") ? "https" : config.protocol,
+      port
+    });
+
+    const fingerprint = fingerprintHttp(
+      {
+        ...headersResult.headers,
+        ...(advancedProbe?.headers || {})
+      },
+      host,
+      advancedProbe
+    );
+
+    const intel = {
+      ...headersResult,
+      port,
+      service,
+      advancedProbe,
+      fingerprint
+    };
+
+    devLog("HTTP intelligence", {
+      host,
+      port,
+      service,
+      status: headersResult.status,
+      title: advancedProbe?.title || ""
+    });
+
+    return intel;
+  };
+
   const handleAudit = async (targetOverride = null) => {
-    const effectiveTarget =
+    const effectiveTarget = normalizeScanTarget(
       typeof targetOverride === "string" && targetOverride.trim()
         ? targetOverride
-        : targetHost;
+        : targetHost
+    );
 
     if (mode === 0 && !sourceText.trim()) return;
-    if (mode === 1 && !["secrets", "docker", "permissions", "nginx"].includes(scanType) && !effectiveTarget.trim()) return;
-    if (mode === 1 && ["secrets", "docker", "permissions", "nginx"].includes(scanType) && !sourceText.trim()) return;
+    if (mode === 1 && !effectiveTarget.trim()) return;
+    if (mode === 2 && !sourceText.trim()) return;
     
     setAnalyzing(true);
     setResult(null);
@@ -427,7 +732,9 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         } else if (scanType === "infra") {
           updateProgress(10, "Running infrastructure discovery...");
 
-          const infraScan = await portScan(effectiveTarget, COMMON_PORTS);
+          const infraScan = await portScan(effectiveTarget, {
+            ports: COMMON_PORTS.join(",")
+          });
 
           updateProgress(60, "Correlating exposure signals...");
 
@@ -447,61 +754,42 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
           let sshData = null;
           let sshAuditData = null;
           let serviceProbeData = {};
+          let webIntelData = {};
           let redirectedHostData = null;
 
           if (hasHttps || hasHttp) {
             updateProgress(75, "Fingerprinting HTTP/TLS exposure...");
 
-            const protocol = hasHttps ? "https" : "http";
+            const primaryPort = hasHttps ? 443 : 80;
+            const primaryService = hasHttps ? "https" : "http";
 
-            httpData = await httpHeadersCheck(effectiveTarget, {
-              protocol
-            });
+            httpData = await buildHttpIntel(
+              effectiveTarget,
+              primaryService,
+              primaryPort
+            );
 
-            if (!httpData?.success && protocol === 'https') {
-              console.log('HTTPS failed, retrying via HTTP...');
-
-              httpData = await httpHeadersCheck(effectiveTarget, {
-                protocol: 'http'
-              });
+            if (!httpData?.success && hasHttp && primaryPort === 443) {
+              httpData = await buildHttpIntel(effectiveTarget, "http", 80);
             }
 
-            console.log('HTTP DATA DEBUG', httpData);
-
             if (httpData?.success && httpData.headers) {
-              const fingerprint = fingerprintHttp(
-                httpData.headers,
-                targetHost
-              );
-
-              httpData.fingerprint = fingerprint;
-
-              console.log('CALLING ADVANCED PROBE');
-
-              const advancedProbe = await advancedHttpProbe(
-                effectiveTarget,
-                { protocol }
-              );
-
-              console.log('ADVANCED PROBE RAW', advancedProbe);
-
-              httpData.advancedProbe = advancedProbe;
+              webIntelData[String(httpData.port || primaryPort)] = httpData;
 
               try {
-                const finalHost = advancedProbe?.finalUrl
-                  ? new URL(advancedProbe.finalUrl).hostname
+                const finalHost = httpData.advancedProbe?.finalUrl
+                  ? new URL(httpData.advancedProbe.finalUrl).hostname
                   : "";
 
                 if (
                   finalHost &&
-                  finalHost !== targetHost &&
-                  finalHost !== targetHost.replace(/^www\./, "")
+                  finalHost !== effectiveTarget
                 ) {
-                  console.log("REDIRECTED HOST DETECTED", finalHost);
+                  devLog("Redirected host detected", finalHost);
 
                   const redirectedScan = await portScan(
                     finalHost,
-                    scanPorts
+                    { ports: COMMON_PORTS.join(",") }
                   );
 
                   const redirectedOpenPorts = redirectedScan?.results?.filter(
@@ -522,23 +810,11 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
                   if (redirectedHasHttps || redirectedHasHttp) {
                     const redirectedProtocol = redirectedHasHttps ? "https" : "http";
 
-                    redirectedHttpData = await httpHeadersCheck(finalHost, {
-                      protocol: redirectedProtocol
-                    });
-
-                    if (redirectedHttpData?.success && redirectedHttpData.headers) {
-                      const redirectedFingerprint = fingerprintHttp(
-                        redirectedHttpData.headers,
-                        finalHost
-                      );
-
-                      redirectedHttpData.fingerprint = redirectedFingerprint;
-
-                      redirectedHttpData.advancedProbe = await advancedHttpProbe(
-                        finalHost,
-                        { protocol: redirectedProtocol }
-                      );
-                    }
+                    redirectedHttpData = await buildHttpIntel(
+                      finalHost,
+                      redirectedProtocol,
+                      redirectedHasHttps ? 443 : 80
+                    );
 
                     if (redirectedHasHttps) {
                       redirectedTlsData = await tlsCheck(finalHost, 443);
@@ -557,15 +833,13 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
                   };
                 }
               } catch (redirectError) {
-                console.warn("Redirect host scan failed", redirectError);
+                devLog("Redirect host scan failed", redirectError);
               }
 
-              console.log('ADVANCED PROBE RESULT', advancedProbe);
-
-              findings.push(...fingerprint.findings);
+              findings.push(...httpData.fingerprint.findings);
 
               detectedStack.push(
-                ...fingerprint.detectedStack.map((s) => s.name)
+                ...httpData.fingerprint.detectedStack.map((s) => s.name)
               );
             }
           }
@@ -580,7 +854,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
             ftpData = await ftpProbe(effectiveTarget, 21);
 
-            console.log("FTP PROBE RESULT", ftpData);
+            devLog("FTP probe result", ftpData);
           }
 
           if (hasSsh) {
@@ -607,7 +881,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
               );
             }
 
-            console.log("SSH AUDIT RESULT", sshAuditData);
+            devLog("SSH audit result", sshAuditData);
           }
 
           if (hasHttps) {
@@ -647,6 +921,49 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             (summary.openPorts || []).map((p) => p.port)
           );
 
+          const webTargets = serviceMatrix.filter((item) =>
+            ["http", "https", "http-alt", "https-alt", "grafana", "prometheus", "docker", "elasticsearch"].includes(item.service) &&
+            !webIntelData[String(item.port)]
+          );
+
+          if (webTargets.length > 0) {
+            updateProgress(84, "Collecting per-service web intelligence...");
+
+            const webResults = await Promise.all(
+              webTargets.map((item) =>
+                buildHttpIntel(effectiveTarget, item.service, item.port)
+                  .catch((error) => ({
+                    success: false,
+                    port: item.port,
+                    service: item.service,
+                    error: error.message
+                  }))
+              )
+            );
+
+            webIntelData = {
+              ...webIntelData,
+              ...Object.fromEntries(
+                webResults
+                  .filter(Boolean)
+                  .map((item) => [String(item.port), item])
+              )
+            };
+
+            webResults.forEach((item) => {
+              if (item?.fingerprint?.findings?.length) {
+                findings.push(...item.fingerprint.findings.map((finding) => ({
+                  ...finding,
+                  title: `${item.service}:${item.port} ${finding.title}`
+                })));
+              }
+
+              if (item?.fingerprint?.detectedStack?.length) {
+                detectedStack.push(...item.fingerprint.detectedStack.map((s) => s.name));
+              }
+            });
+          }
+
           const genericTargets = serviceMatrix.filter((item) =>
             genericProbeServices.includes(item.service)
           );
@@ -671,7 +988,64 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
               genericResults.map((item) => [String(item.port), item])
             );
 
-            console.log("GENERIC SERVICE PROBES", serviceProbeData);
+            devLog("Service probes complete", Object.keys(serviceProbeData));
+
+            genericResults.forEach((probe) => {
+              if (probe?.docker?.critical) {
+                findings.push({
+                  title: "Docker HTTP API exposed",
+                  severity: "CRITICAL",
+                  evidence: `Docker API responded on ${effectiveTarget}:${probe.port}.`,
+                  remediation: "Do not expose Docker API publicly. Bind it to localhost, require TLS client authentication, or place it behind a private control plane only."
+                });
+              }
+
+              if (probe?.database?.isDatabase) {
+                const unauthenticated = probe.database.auth === "not-required-or-ping-allowed" || probe.database.redisPongWithoutAuth || probe.database.redisInfoAvailable;
+                addFindingOnce(findings, {
+                  title: `${probe.database.vendor || probe.service} database exposure`,
+                  severity: unauthenticated ? "CRITICAL" : "HIGH",
+                  evidence: `${probe.database.vendor || probe.service} responded on ${effectiveTarget}:${probe.port}${probe.database.version ? ` with version ${probe.database.version}` : ""}. Authentication posture: ${probe.database.auth || "unknown"}.`,
+                  remediation: "Restrict database access to private networks or trusted application hosts and enforce service-level authentication."
+                });
+              }
+
+              if (probe?.elasticsearch?.reachable) {
+                findings.push({
+                  title: "Elasticsearch endpoint reachable",
+                  severity: "HIGH",
+                  evidence: `Cluster ${probe.elasticsearch.clusterName || "unknown"} ${probe.elasticsearch.version ? `version ${probe.elasticsearch.version}` : ""} responded on port ${probe.port}.`,
+                  remediation: "Restrict Elasticsearch to private networks and enforce authentication before exposing any API endpoint."
+                });
+              }
+
+              if (probe?.prometheus?.metricsReachable) {
+                findings.push({
+                  title: "Prometheus metrics endpoint reachable",
+                  severity: "HIGH",
+                  evidence: `/metrics responded on ${effectiveTarget}:${probe.port}.`,
+                  remediation: "Restrict Prometheus UI and metrics endpoints with network allowlists, authentication, or a private VPN."
+                });
+              }
+
+              if (probe?.grafana?.loginPage) {
+                findings.push({
+                  title: "Grafana login surface reachable",
+                  severity: "MEDIUM",
+                  evidence: `Grafana login page appears reachable on ${effectiveTarget}:${probe.port}.`,
+                  remediation: "Keep Grafana behind SSO, VPN or IP allowlists, and verify anonymous access is disabled."
+                });
+              }
+
+              if (probe?.lightning?.publicCritical) {
+                findings.push({
+                  title: "LND gRPC endpoint publicly reachable",
+                  severity: "CRITICAL",
+                  evidence: `LND gRPC-like endpoint accepts TCP connections on ${effectiveTarget}:${probe.port}.`,
+                  remediation: "Restrict LND gRPC to localhost, VPN or trusted peers only and require TLS/macaroon controls."
+                });
+              }
+            });
           }
 
           const serviceContexts = {};
@@ -690,12 +1064,39 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             };
           }
 
+          Object.entries(webIntelData || {}).forEach(([port, intel]) => {
+            if (!intel?.success) return;
+            const missingSecurityHeaders = intel.fingerprint?.metadata?.securityHeaders?.missing?.length > 0;
+            const adminPanelDetected = Boolean(
+              intel.advancedProbe?.fingerprint?.loginPanel ||
+              intel.advancedProbe?.fingerprint?.adminPath ||
+              intel.advancedProbe?.fingerprint?.phpmyadmin ||
+              intel.advancedProbe?.fingerprint?.grafana ||
+              intel.advancedProbe?.fingerprint?.prometheus ||
+              intel.advancedProbe?.fingerprint?.portainer ||
+              intel.advancedProbe?.fingerprint?.nextcloud ||
+              intel.advancedProbe?.fingerprint?.lnbits ||
+              intel.advancedProbe?.fingerprint?.wordpressAdmin ||
+              intel.advancedProbe?.adminHints?.length ||
+              intel.fingerprint?.metadata?.adminPanels?.length
+            );
+            serviceContexts[port] = {
+              ...(serviceContexts[port] || {}),
+              versionDisclosure: Boolean(intel?.fingerprint?.versions && Object.keys(intel.fingerprint.versions).length),
+              tlsMissing: !String(intel.url || "").startsWith("https:"),
+              authWeakOrUnknown: adminPanelDetected,
+              adminPanelDetected,
+              securityHeadersMissing: missingSecurityHeaders,
+              metadataLeak: Boolean(intel.fingerprint?.metadata?.reverseProxy?.metadataDisclosure || intel.fingerprint?.metadata?.poweredBy)
+            };
+          });
+
           if (findings?.some((f) => String(f.title || "").includes("Missing security header"))) {
-            ["80", "443", "8080", "8443"].forEach((port) => {
+            ["80", "443", "8080", "8443", "3000", "9090", "9200"].forEach((port) => {
               serviceContexts[port] = {
                 ...(serviceContexts[port] || {}),
-                versionDisclosure: Boolean(httpData?.fingerprint?.versions && Object.keys(httpData.fingerprint.versions).length),
-                tlsMissing: port === "80",
+                versionDisclosure: Boolean(webIntelData[port]?.fingerprint?.versions && Object.keys(webIntelData[port].fingerprint.versions).length),
+                tlsMissing: port === "80" || port === "8080" || port === "3000" || port === "9090" || port === "9200",
                 authWeakOrUnknown: true
               };
             });
@@ -703,51 +1104,61 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
           Object.entries(serviceProbeData || {}).forEach(([port, probe]) => {
             serviceContexts[port] = {
+              ...(serviceContexts[port] || {}),
               versionDisclosure: Boolean(
-                probe?.banner?.match(/[0-9]+\.[0-9]+/)
+                probe?.banner?.match(/[0-9]+\.[0-9]+/) ||
+                probe?.database?.version ||
+                probe?.elasticsearch?.version ||
+                probe?.grafana?.version ||
+                probe?.docker?.version
               ),
-              authWeakOrUnknown: !probe?.mail?.auth?.length,
-              tlsMissing: probe?.mail?.isMailService && !probe?.mail?.starttls && !probe?.mail?.implicitTls
+              authWeakOrUnknown:
+                probe?.docker?.critical ||
+                (probe?.database?.isDatabase ? probe.database.auth !== "required" : false) ||
+                (!probe?.mail?.isMailService ? false : !probe?.mail?.auth?.length),
+              tlsMissing:
+                (probe?.docker?.apiReachable && !probe?.docker?.tlsPresent) ||
+                probe?.mail?.isMailService && !probe?.mail?.starttls && !probe?.mail?.implicitTls,
+              tlsPresent: Boolean(probe?.docker?.tlsPresent || probe?.mail?.implicitTls),
+              authenticationConfirmed: probe?.database?.auth === "required",
+              unauthenticatedAccess: Boolean(
+                probe?.database?.auth === "not-required-or-ping-allowed" ||
+                probe?.database?.redisPongWithoutAuth ||
+                probe?.database?.redisInfoAvailable
+              ),
+              databaseExposure: Boolean(probe?.database?.isDatabase),
+              dockerExposure: Boolean(probe?.docker?.apiReachable || probe?.docker?.critical),
+              metadataLeak: Boolean(probe?.database?.version || probe?.docker?.version)
             };
+          });
+
+          if (sshAuditData?.parsed?.score !== undefined && sshAuditData.parsed.score < 70) {
+            serviceContexts["22"] = {
+              ...(serviceContexts["22"] || {}),
+              weakCrypto: true
+            };
+          }
+
+          generateInfrastructureFindings({
+            target: effectiveTarget,
+            serviceMatrix,
+            findings,
+            webIntelData,
+            serviceProbeData,
+            sshAuditData,
+            tlsData
           });
 
           const exposureRisk = calculateGlobalRisk(
             serviceMatrix,
             serviceContexts
           );
-
-          if (findings?.length) {
-            const findingPenalty = findings.reduce((sum, finding) => {
-              const title = String(finding.title || "").toLowerCase();
-
-              if (title.includes("missing security header")) return sum + 1;
-
-              if (finding.severity === "CRITICAL") return sum + 45;
-              if (finding.severity === "HIGH") return sum + 30;
-              if (finding.severity === "MEDIUM") return sum + 10;
-              if (finding.severity === "LOW") return sum + 4;
-              return sum;
-            }, 0);
-
-            exposureRisk.score = Math.max(0, exposureRisk.score - findingPenalty);
-            const openServiceNames = new Set(
-              serviceMatrix.map((item) => item.service)
-            );
-
-            const onlyWebExposure = [...openServiceNames].every((service) =>
-              ["http", "https", "http-alt", "https-alt"].includes(service)
-            );
-
-            if (onlyWebExposure && exposureRisk.score < 60) {
-              exposureRisk.score = 60;
-            }
-
-            exposureRisk.level =
-              exposureRisk.score < 30 ? "CRITICAL" :
-              exposureRisk.score < 55 ? "HIGH" :
-              exposureRisk.score < 75 ? "MEDIUM" :
-              "LOW";
-          }
+          const attackSurfaceSummary = buildAttackSurfaceSummary(
+            serviceMatrix,
+            webIntelData,
+            exposureRisk,
+            serviceProbeData
+          );
 
           const localInfraResult = {
             title: "Infrastructure X-Ray Result",
@@ -762,16 +1173,20 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             ftpData,
             sshAuditData,
             serviceProbeData,
+            webIntelData,
             redirectedHostData,
+            attackSurfaceSummary,
             exposureRisk
           };
 
           setLocalResult(localInfraResult);
 
           response = {
-            severity: findings.some((f) => f.severity === "HIGH")
-              ? "HIGH"
-              : findings.some((f) => f.severity === "MEDIUM")
+            severity: findings.some((f) => f.severity === "CRITICAL")
+              ? "CRITICAL"
+              : findings.some((f) => f.severity === "HIGH")
+                ? "HIGH"
+                : findings.some((f) => f.severity === "MEDIUM")
                 ? "MEDIUM"
                 : "LOW",
             confidence: "HIGH",
@@ -865,6 +1280,15 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
     
     updateProgress(100, "Audit complete.");
     setResult(response);
+    if (mode === 2 && localTextScanTypes.includes(scanType) && response) {
+      onLocalResult?.({
+        scanType,
+        input: scanType === "secrets"
+          ? "[local secret detection input redacted]"
+          : `[${scanType}] local pasted input`,
+        output: response,
+      });
+    }
     setAnalyzing(false);
     setTimeout(() => setProgress(null), 700);
   };
@@ -882,23 +1306,30 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
       <div style={{ marginBottom: 16 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-          Modalità
+          {t.securityAuditorPage.modeLabel}
         </label>
         <div style={{ display: "flex", gap: 12 }}>
-          <button onClick={() => setMode(0)} style={{
+          <button onClick={() => changeMode(0)} style={{
             flex: 1, padding: "10px", borderRadius: 8, fontSize: 13, fontWeight: 500,
             background: mode === 0 ? "#00D4AA" : "#1A1F2E",
             color: mode === 0 ? "#0B0E14" : "#8B95A8",
             border: `1px solid ${mode === 0 ? "#00D4AA" : "#1E2535"}`,
             cursor: "pointer",
-          }}>📄 Analisi Configurazione</button>
-          <button onClick={() => setMode(1)} style={{
+          }}>📄 {t.securityAuditorPage.configMode}</button>
+          <button onClick={() => changeMode(1)} style={{
             flex: 1, padding: "10px", borderRadius: 8, fontSize: 13, fontWeight: 500,
             background: mode === 1 ? "#00D4AA" : "#1A1F2E",
             color: mode === 1 ? "#0B0E14" : "#8B95A8",
             border: `1px solid ${mode === 1 ? "#00D4AA" : "#1E2535"}`,
             cursor: "pointer",
-          }}>🌐 Scan Remoto</button>
+          }}>🌐 {t.securityAuditorPage.remoteMode}</button>
+          <button onClick={() => changeMode(2)} style={{
+            flex: 1, padding: "10px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+            background: mode === 2 ? "#00D4AA" : "#1A1F2E",
+            color: mode === 2 ? "#0B0E14" : "#8B95A8",
+            border: `1px solid ${mode === 2 ? "#00D4AA" : "#1E2535"}`,
+            cursor: "pointer",
+          }}>🔐 {t.securityAuditorPage.localMode}</button>
         </div>
       </div>
 
@@ -944,77 +1375,48 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         <>
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-              🔍 Tipo di Scan
+              🔍 {t.securityAuditorPage.scanTypeLabel}
             </label>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setScanType("ports")} style={{
+              <button onClick={() => changeScanType("ports")} style={{
                 flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
                 background: scanType === "ports" ? "#00D4AA" : "#1A1F2E",
                 color: scanType === "ports" ? "#0B0E14" : "#8B95A8",
                 border: `1px solid ${scanType === "ports" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
-              }}>🔌 Port Scan</button>
-              <button onClick={() => setScanType("ssl")} style={{
+              }}>🔌 {t.securityAuditorPage.scanTypes.ports}</button>
+              <button onClick={() => changeScanType("ssl")} style={{
                 flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
                 background: scanType === "ssl" ? "#00D4AA" : "#1A1F2E",
                 color: scanType === "ssl" ? "#0B0E14" : "#8B95A8",
                 border: `1px solid ${scanType === "ssl" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
-              }}>🔒 TLS Check</button>
-              <button onClick={() => setScanType("ssh")} style={{
+              }}>🔒 {t.securityAuditorPage.scanTypes.ssl}</button>
+              <button onClick={() => changeScanType("ssh")} style={{
                 flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
                 background: scanType === "ssh" ? "#00D4AA" : "#1A1F2E",
                 color: scanType === "ssh" ? "#0B0E14" : "#8B95A8",
                 border: `1px solid ${scanType === "ssh" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
-              }}>🖥️ SSH Audit</button>
-              <button onClick={() => setScanType("secrets")} style={{
-                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
-                background: scanType === "secrets" ? "#00D4AA" : "#1A1F2E",
-                color: scanType === "secrets" ? "#0B0E14" : "#8B95A8",
-                border: `1px solid ${scanType === "secrets" ? "#00D4AA" : "#1E2535"}`,
-                cursor: "pointer",
-              }}>🔑 Secret Detection</button>
-              <button onClick={() => setScanType("docker")} style={{
-                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
-                background: scanType === "docker" ? "#00D4AA" : "#1A1F2E",
-                color: scanType === "docker" ? "#0B0E14" : "#8B95A8",
-                border: `1px solid ${scanType === "docker" ? "#00D4AA" : "#1E2535"}`,
-                cursor: "pointer",
-              }}>🐳 Docker Audit</button>
-              <button onClick={() => setScanType("permissions")} style={{
-                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
-                background: scanType === "permissions" ? "#00D4AA" : "#1A1F2E",
-                color: scanType === "permissions" ? "#0B0E14" : "#8B95A8",
-                border: `1px solid ${scanType === "permissions" ? "#00D4AA" : "#1E2535"}`,
-                cursor: "pointer",
-              }}>🔐 Permission Audit</button>
-              <button onClick={() => setScanType("nginx")} style={{
-                flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
-                background: scanType === "nginx" ? "#00D4AA" : "#1A1F2E",
-                color: scanType === "nginx" ? "#0B0E14" : "#8B95A8",
-                border: `1px solid ${scanType === "nginx" ? "#00D4AA" : "#1E2535"}`,
-                cursor: "pointer",
-              }}>🌐 Proxy Audit</button>
-              <button onClick={() => setScanType("infra")} style={{
+              }}>🖥️ {t.securityAuditorPage.scanTypes.ssh}</button>
+              <button onClick={() => changeScanType("infra")} style={{
                 flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
                 background: scanType === "infra" ? "#00D4AA" : "#1A1F2E",
                 color: scanType === "infra" ? "#0B0E14" : "#8B95A8",
                 border: `1px solid ${scanType === "infra" ? "#00D4AA" : "#1E2535"}`,
                 cursor: "pointer",
-              }}>🧠 Infra Intel</button>
+              }}>🧠 {t.securityAuditorPage.scanTypes.infra}</button>
             </div>
           </div>
 
-          {!["secrets", "docker", "permissions", "nginx"].includes(scanType) ? (
-            <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-                🌐 IP o Dominio
+                🌐 {t.securityAuditorPage.targetLabel}
               </label>
               <input
                 value={targetHost}
                 onChange={(e) => setTargetHost(e.target.value)}
-                placeholder="es. 192.168.1.1 o example.com"
+                placeholder={t.securityAuditorPage.targetPlaceholder}
                 style={{
                   width: "100%", padding: "12px 16px", borderRadius: 12,
                   background: "#131720", border: "1px solid #1E2535",
@@ -1022,37 +1424,12 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
                 }}
               />
             </div>
-          ) : (
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-                {scanType === "docker" ? "🐳 docker-compose.yml" : scanType === "permissions" ? "🔐 ls -la / sudoers / permission output" : scanType === "nginx" ? "🌐 nginx / Caddy / reverse proxy config" : "🔑 Config / .env / docker-compose / script"}
-              </label>
-              <textarea
-                value={sourceText}
-                onChange={(e) => setSourceText(e.target.value)}
-                placeholder={
-                  scanType === "docker"
-                    ? "Paste docker-compose.yml content here..."
-                    : scanType === "permissions"
-                      ? "Paste ls -la, find output or sudoers snippets here..."
-                      : scanType === "nginx"
-                        ? "Paste nginx, Caddy or reverse proxy configuration here..."
-                        : "Paste configuration content here...\n\nExample:\nDATABASE_URL=postgres://user:password@localhost:5432/app\nAPI_TOKEN=..."
-                }
-                style={{
-                  width: "100%", height: 220, padding: 16, borderRadius: 12,
-                  background: "#131720", border: "1px solid #1E2535",
-                  color: "#E8ECF4", fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
-                  resize: "vertical",
-                }}
-              />
-            </div>
-          )}
+          
 
           {scanType === "ports" && (
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-                🔌 Porte (separate da virgola)
+                🔌 {t.securityAuditorPage.portsLabel}
               </label>
               <input
                 value={scanPorts}
@@ -1069,11 +1446,57 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
         </>
       )}
 
+      {mode === 2 && (
+        <>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
+              🔍 {t.securityAuditorPage.scanTypeLabel}
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {["secrets", "docker", "permissions", "nginx"].map((type) => (
+                <button key={type} onClick={() => changeScanType(type)} style={{
+                  flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
+                  background: scanType === type ? "#00D4AA" : "#1A1F2E",
+                  color: scanType === type ? "#0B0E14" : "#8B95A8",
+                  border: `1px solid ${scanType === type ? "#00D4AA" : "#1E2535"}`,
+                  cursor: "pointer",
+                }}>{type === "secrets" ? "🔑" : type === "docker" ? "🐳" : type === "permissions" ? "🔐" : "🌐"} {t.securityAuditorPage.scanTypes[type]}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
+                {scanType === "docker" ? `🐳 ${t.securityAuditorPage.textLabels.docker}` : scanType === "permissions" ? `🔐 ${t.securityAuditorPage.textLabels.permissions}` : scanType === "nginx" ? `🌐 ${t.securityAuditorPage.textLabels.nginx}` : `🔑 ${t.securityAuditorPage.textLabels.secrets}`}
+              </label>
+              <textarea
+                value={sourceText}
+                onChange={(e) => setSourceText(e.target.value)}
+                placeholder={
+                  scanType === "docker"
+                    ? t.securityAuditorPage.textPlaceholders.docker
+                    : scanType === "permissions"
+                      ? t.securityAuditorPage.textPlaceholders.permissions
+                      : scanType === "nginx"
+                        ? t.securityAuditorPage.textPlaceholders.nginx
+                        : t.securityAuditorPage.textPlaceholders.secrets
+                }
+                style={{
+                  width: "100%", height: 220, padding: 16, borderRadius: 12,
+                  background: "#131720", border: "1px solid #1E2535",
+                  color: "#E8ECF4", fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
+                  resize: "vertical",
+                }}
+              />
+            </div>
+        </>
+      )}
+
       <button onClick={handleAudit} style={{
         marginTop: 12, padding: "12px 28px", background: "#00D4AA", color: "#0B0E14",
         border: "none", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer",
       }}>
-        {analyzing ? t.securityAuditorPage.analyzing : scanType === "secrets" ? "Analyze Secrets" : scanType === "docker" ? "Analyze Docker" : scanType === "permissions" ? "Analyze Permissions" : scanType === "nginx" ? "Analyze Proxy" : t.securityAuditorPage.analyze}
+        {analyzing ? t.securityAuditorPage.analyzing : scanType === "secrets" ? t.securityAuditorPage.actions.secrets : scanType === "docker" ? t.securityAuditorPage.actions.docker : scanType === "permissions" ? t.securityAuditorPage.actions.permissions : scanType === "nginx" ? t.securityAuditorPage.actions.nginx : t.securityAuditorPage.analyze}
       </button>
 
       {analyzing && progress && (
@@ -1118,6 +1541,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
       {localResult && (
         <LocalSecurityResult
           result={localResult}
+          t={t}
           onAnalyzeRedirectedHost={(host) => {
             setTargetHost(host);
             handleAudit(host);
@@ -1126,11 +1550,11 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             if (!localResult) return;
 
             setAnalyzing(true);
-            updateProgress(20, "Preparing AI analysis payload...");
+            updateProgress(20, t.securityAuditorPage.progress.aiPayload);
 
-            const aiPayload = JSON.stringify(localResult, null, 2);
+            const aiPayload = JSON.stringify(sanitizeInfrastructurePayload(localResult), null, 2);
 
-            updateProgress(60, "AI operational analysis in progress...");
+            updateProgress(60, t.securityAuditorPage.progress.aiAnalysis);
 
             const aiResponse = await onScan(
               targetHost || "local-security-audit",
@@ -1138,7 +1562,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
               aiPayload
             );
 
-            updateProgress(95, "Preparing AI report...");
+            updateProgress(95, t.securityAuditorPage.progress.aiReport);
 
             setResult(aiResponse);
             setLocalResult(null);
@@ -1150,7 +1574,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
 
       {result && !localResult && (
         <div style={{ marginTop: 24, animation: "slideInRight 0.3s ease" }}>
-          <ProfessionalResult result={result} />
+          <ProfessionalResult result={result} t={t} />
         </div>
       )}
 
@@ -1167,7 +1591,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onBack }) => {
             cursor: "pointer"
           }}
         >
-          🌐 {showNetworkVisibility ? "Hide Live Network Visibility" : "Open Live Network Visibility"}
+          🌐 {showNetworkVisibility ? t.securityAuditorPage.networkVisibilityHide : t.securityAuditorPage.networkVisibilityOpen}
         </button>
 
         {showNetworkVisibility && <NetworkVisibility />}

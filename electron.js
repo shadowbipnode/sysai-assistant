@@ -9,6 +9,12 @@ const https = require('https');
 
 let mainWindow;
 
+function devLog(...args) {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(...args);
+  }
+}
+
 function isSafeExternalUrl(url) {
   try {
     const parsed = new URL(url);
@@ -304,7 +310,7 @@ function guessService(port) {
     21: 'FTP', 22: 'SSH', 23: 'Telnet', 25: 'SMTP', 53: 'DNS',
     80: 'HTTP', 110: 'POP3', 143: 'IMAP', 443: 'HTTPS', 445: 'SMB',
     465: 'SMTPS', 587: 'Submission', 993: 'IMAPS', 995: 'POP3S', 3306: 'MySQL', 5432: 'PostgreSQL',
-    6379: 'Redis', 8080: 'HTTP-Alt', 8443: 'HTTPS-Alt', 27017: 'MongoDB',
+    6379: 'Redis', 2375: 'Docker', 2376: 'Docker-TLS', 3000: 'Grafana', 8080: 'HTTP-Alt', 8443: 'HTTPS-Alt', 9090: 'Prometheus', 9200: 'Elasticsearch', 27017: 'MongoDB',
     9735: 'Lightning', 8333: 'Bitcoin', 10009: 'LND-gRPC',
   };
   return services[port] || 'unknown';
@@ -483,7 +489,7 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
   try {
     switch (type) {
       case 'port-scan': {
-        const ports = options.ports || '21,22,25,53,80,110,143,443,445,465,587,993,995,3306,5432,6379,8080,8443,8333,9735,10009,27017';
+        const ports = options.ports || '21,22,25,53,80,110,143,443,445,465,587,993,995,2375,2376,3000,3306,5432,6379,8080,8443,8333,9090,9200,9735,10009,27017';
         const timeout = Math.min(options.timeout || 3000, 10000); // Max 10s
         const results = await portScan(safeTarget, ports, timeout);
         return { success: true, type: 'port-scan', target: safeTarget, results };
@@ -508,24 +514,125 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
         const port = Number(options.port);
         const service = options.service || 'unknown';
 
-        const isTlsService = ['smtps', 'imaps', 'pop3s', 'ldaps'].includes(service);
+        const isTlsService = ['smtps', 'imaps', 'pop3s', 'ldaps', 'lnd-grpc'].includes(service);
+        const httpProbeServices = ['docker', 'elasticsearch', 'prometheus', 'grafana'];
+
+        if (httpProbeServices.includes(service)) {
+          const protocol = service === 'docker' && port === 2376 ? 'https' : 'http';
+          const baseUrl = `${protocol}://${safeTarget}:${port}`;
+          const fetchText = async (pathName, method = 'GET') => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), Math.min(options.timeout || 5000, 10000));
+            try {
+              const response = await fetch(`${baseUrl}${pathName}`, {
+                method,
+                redirect: 'manual',
+                signal: controller.signal,
+                headers: { 'User-Agent': 'SysAI-Infrastructure-Intelligence/2.0' }
+              });
+              const text = method === 'HEAD' ? '' : await response.text();
+              return {
+                ok: true,
+                status: response.status,
+                url: `${baseUrl}${pathName}`,
+                headers: Object.fromEntries(response.headers.entries()),
+                text: text.slice(0, 200000),
+                size: text.length
+              };
+            } catch (error) {
+              return { ok: false, url: `${baseUrl}${pathName}`, error: error.message };
+            } finally {
+              clearTimeout(timer);
+            }
+          };
+
+          const root = await fetchText('/');
+          const payload = {
+            success: Boolean(root.ok),
+            type: 'tcp-service-probe',
+            target: safeTarget,
+            port,
+            service,
+            banner: root.text ? root.text.slice(0, 4000) : '',
+            bannerLength: root.size || 0,
+            http: {
+              url: root.url,
+              status: root.status,
+              headers: root.headers || {},
+              responseSize: root.size || 0
+            }
+          };
+
+          if (service === 'docker') {
+            const version = await fetchText('/version');
+            const tlsProbe = port === 2376 ? await tlsCheck(safeTarget, port) : null;
+            let versionJson = null;
+            try { versionJson = JSON.parse(version.text || '{}'); } catch { versionJson = null; }
+            payload.docker = {
+              apiReachable: Boolean(root.ok || version.ok || tlsProbe?.success),
+              publicHttpApi: Boolean((root.status && root.status < 500) || (version.status && version.status < 500)),
+              tlsPresent: Boolean(tlsProbe?.success),
+              tlsProtocol: tlsProbe?.protocol || '',
+              tlsWarnings: tlsProbe?.warnings || [],
+              version: versionJson?.Version || versionJson?.ApiVersion || '',
+              apiVersion: versionJson?.ApiVersion || '',
+              critical: Boolean((root.status && root.status < 500) || (version.status && version.status < 500) || tlsProbe?.success)
+            };
+          }
+
+          if (service === 'elasticsearch') {
+            let json = null;
+            try { json = JSON.parse(root.text || '{}'); } catch { json = null; }
+            payload.elasticsearch = {
+              clusterName: json?.cluster_name || '',
+              version: json?.version?.number || '',
+              tagline: json?.tagline || '',
+              reachable: Boolean(root.ok)
+            };
+          }
+
+          if (service === 'prometheus') {
+            const metrics = await fetchText('/metrics', 'GET');
+            const graph = await fetchText('/graph', 'HEAD');
+            payload.prometheus = {
+              metricsReachable: Boolean(metrics.ok && metrics.status < 400),
+              uiReachable: Boolean(root.ok || graph.ok),
+              versionHint: (root.text || metrics.text || '').match(/prometheus[_-]?version["\s:=]+([0-9][^"'\s<]+)/i)?.[1] || ''
+            };
+          }
+
+          if (service === 'grafana') {
+            const login = /grafana|login|signin/i.test(root.text || '');
+            const version =
+              (root.text || '').match(/grafana(?:Version)?["'\s:=]+([0-9]+\.[0-9][^"'\s<]*)/i)?.[1] ||
+              (root.headers?.['x-grafana-version'] || '');
+            payload.grafana = {
+              loginPage: login,
+              version,
+              reachable: Boolean(root.ok)
+            };
+          }
+
+          devLog('[SysAI] HTTP service probe', { service, port, success: payload.success });
+          return payload;
+        }
 
         const result = await new Promise((resolve) => {
           let socket;
           let data = '';
+          const chunks = [];
           let resolved = false;
-          let stage = 'connect';
 
           const finish = (payload) => {
             if (resolved) return;
             resolved = true;
-            try { socket.destroy(); } catch (_) {}
+            try { socket.destroy(); } catch { socket = null; }
             resolve(payload);
           };
 
           const buildPayload = () => {
+            const rawBuffer = Buffer.concat(chunks);
             const banner = data.trim().slice(0, 8000);
-
             const mail = {
               isMailService: ['smtp', 'smtps', 'submission', 'pop3', 'pop3s', 'imap', 'imaps'].includes(service),
               implicitTls: ['smtps', 'imaps', 'pop3s'].includes(service),
@@ -570,6 +677,53 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
               }
             });
 
+            const mysqlVersion =
+              banner.match(/([0-9]+\.[0-9]+\.[0-9]+[-A-Za-z0-9._]*)-MariaDB/i)?.[1] ||
+              banner.match(/([0-9]+\.[0-9]+\.[0-9]+)/)?.[1] ||
+              '';
+            const mysqlAuth =
+              banner.match(/(mysql_native_password|caching_sha2_password|sha256_password|auth_socket)/i)?.[1] ||
+              rawBuffer.toString('latin1').match(/(mysql_native_password|caching_sha2_password|sha256_password|auth_socket)/i)?.[1] ||
+              '';
+
+            const database = {
+              isDatabase: ['mysql', 'postgresql', 'redis', 'mongodb', 'mssql', 'oracle'].includes(service),
+              vendor:
+                service === 'mysql' && /mariadb/i.test(banner) ? 'MariaDB' :
+                service === 'mysql' ? 'MySQL/MariaDB' :
+                service === 'redis' ? 'Redis' :
+                service === 'postgresql' ? 'PostgreSQL' :
+                service === 'mongodb' ? 'MongoDB' :
+                service,
+              version:
+                mysqlVersion ||
+                banner.match(/redis_version:([^\r\n]+)/i)?.[1]?.trim() ||
+                '',
+              authPlugin: mysqlAuth,
+              handshakeExposed: ['mysql', 'postgresql', 'mongodb'].includes(service) ? true : Boolean(banner),
+              auth:
+                /NOAUTH|Authentication required/i.test(banner) ? 'required' :
+                /\+PONG/i.test(banner) ? 'not-required-or-ping-allowed' :
+                service === 'postgresql' && !banner ? 'required-or-filtered-after-connect' :
+                service === 'mongodb' && !banner ? 'unknown' :
+                'unknown',
+              redisNoAuth: /NOAUTH/i.test(banner),
+              redisPongWithoutAuth: /\+PONG/i.test(banner),
+              redisInfoAvailable: /redis_version:/i.test(banner),
+              endpointReachable: true
+            };
+
+            const lightning = {
+              isLightning: ['lightning', 'lnd-grpc'].includes(service),
+              tlsReachable: false,
+              grpcLikely: service === 'lnd-grpc',
+              operationalNote: service === 'lightning'
+                ? 'Lightning peer port reachable; confirm intentional public node exposure.'
+                : service === 'lnd-grpc'
+                  ? 'LND gRPC endpoint reachable; public exposure should be treated as critical.'
+                  : ''
+            };
+
             return {
               success: Boolean(banner),
               type: 'tcp-service-probe',
@@ -578,17 +732,18 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
               service,
               banner,
               bannerLength: data.length,
-              mail
+              mail,
+              database,
+              lightning
             };
           };
 
           const send = (cmd) => {
-            try { socket.write(cmd); } catch (_) {}
+            try { socket.write(cmd); } catch { return false; }
+            return true;
           };
 
           const onConnect = () => {
-            stage = 'connected';
-
             if (service === 'smtp' || service === 'smtps' || service === 'submission') {
               setTimeout(() => send('EHLO sysai.local\r\n'), 250);
               setTimeout(() => finish(buildPayload()), 1600);
@@ -614,6 +769,10 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
             }
 
             if (service === 'postgresql') {
+              const sslRequest = Buffer.alloc(8);
+              sslRequest.writeInt32BE(8, 0);
+              sslRequest.writeInt32BE(80877103, 4);
+              try { socket.write(sslRequest); } catch { socket = null; }
               setTimeout(() => finish(buildPayload()), 1400);
               return;
             }
@@ -625,6 +784,36 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
 
             if (service === 'mysql') {
               setTimeout(() => finish(buildPayload()), 1400);
+              return;
+            }
+
+            if (service === 'lnd-grpc') {
+              setTimeout(() => finish({
+                ...buildPayload(),
+                success: true,
+                lightning: {
+                  isLightning: true,
+                  tlsReachable: Boolean(socket.getProtocol?.()),
+                  tlsProtocol: socket.getProtocol?.() || '',
+                  grpcLikely: true,
+                  publicCritical: true,
+                  operationalNote: 'LND gRPC endpoint accepts TCP connections; public exposure should be treated as critical.'
+                }
+              }), 1400);
+              return;
+            }
+
+            if (service === 'lightning') {
+              setTimeout(() => finish({
+                ...buildPayload(),
+                success: true,
+                lightning: {
+                  isLightning: true,
+                  tlsReachable: false,
+                  grpcLikely: false,
+                  operationalNote: 'Lightning peer port accepts TCP connections; confirm this is intentional for node operations.'
+                }
+              }), 1400);
               return;
             }
 
@@ -651,6 +840,7 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
           socket.setTimeout(Math.min(options.timeout || 5000, 10000));
 
           socket.on('data', (chunk) => {
+            chunks.push(chunk);
             data += chunk.toString('utf8');
 
             if (!['smtp', 'smtps', 'submission', 'pop3', 'pop3s', 'imap', 'imaps'].includes(service)) {
@@ -910,42 +1100,108 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
 
 
       case 'advanced-http-probe': {
-        console.log(`[SysAI] Scan: advanced-http-probe → ${safeTarget}`);
+        devLog(`[SysAI] Scan: advanced-http-probe → ${safeTarget}`);
 
         const protocol = options.protocol || 'https';
         const port = options.port || (protocol === 'https' ? 443 : 80);
 
         const url = `${protocol}://${safeTarget}${port === 80 || port === 443 ? '' : `:${port}`}`;
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-
         try {
-          const response = await fetch(url, {
-            method: 'GET',
-            redirect: 'follow',
-            signal: controller.signal,
-            headers: {
-              'User-Agent': 'SysAI-Infrastructure-Intelligence/2.0'
+          const headers = {
+            'User-Agent': 'SysAI-Infrastructure-Intelligence/2.0'
+          };
+
+          const redirectChain = [];
+          let currentUrl = url;
+          let response = null;
+
+          for (let depth = 0; depth < 6; depth += 1) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), Math.min(options.timeout || 10000, 12000));
+            response = await fetch(currentUrl, {
+              method: 'GET',
+              redirect: 'manual',
+              signal: controller.signal,
+              headers
+            });
+            clearTimeout(timeout);
+
+            const location = response.headers.get('location');
+            if (![301, 302, 303, 307, 308].includes(response.status) || !location) {
+              break;
             }
-          });
+
+            const nextUrl = new URL(location, currentUrl).toString();
+            redirectChain.push({
+              status: response.status,
+              from: currentUrl,
+              to: nextUrl
+            });
+            currentUrl = nextUrl;
+          }
 
           const html = await response.text();
 
-          clearTimeout(timeout);
-
           const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+          const cleanTitle = titleMatch?.[1]?.replace(/\s+/g, ' ').trim() || '';
+
+          const adminPaths = [
+            '/login',
+            '/admin',
+            '/wp-login.php',
+            '/wp-admin/',
+            '/grafana/login',
+            '/portainer/',
+            '/phpmyadmin/',
+            '/graph',
+            '/metrics'
+          ];
+          const adminHints = [];
+
+          for (const pathName of adminPaths) {
+            try {
+              const checkUrl = new URL(pathName, currentUrl).toString();
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 3500);
+              const pathResponse = await fetch(checkUrl, {
+                method: 'HEAD',
+                redirect: 'manual',
+                signal: controller.signal,
+                headers
+              });
+              clearTimeout(timeout);
+
+              if (pathResponse.status > 0 && pathResponse.status < 500 && pathResponse.status !== 404) {
+                adminHints.push({
+                  path: pathName,
+                  status: pathResponse.status
+                });
+              }
+            } catch {
+              continue;
+            }
+          }
 
           const fingerprint = {
             wordpress: /wp-content|wordpress/i.test(html),
             grafana: /grafana-app|grafana/i.test(html),
+            prometheus: /prometheus|prometheus_build_info|<title>prometheus/i.test(html),
             nextcloud: /nextcloud/i.test(html),
             phpmyadmin: /phpmyadmin/i.test(html),
+            portainer: /portainer/i.test(html),
+            lnbits: /lnbits/i.test(html),
+            wordpressAdmin: /wp-login\.php|wp-admin/i.test(html),
+            joomla: /joomla|\/media\/system\/js/i.test(html),
+            drupal: /drupal|\/sites\/default\/|drupal-settings-json/i.test(html),
+            laravel: /laravel|laravel_session/i.test(html),
+            express: /express/i.test(response.headers.get('x-powered-by') || ''),
             loginPanel: /login|signin|auth/i.test(html),
+            adminPath: adminHints.some((item) => /login|admin|wp-login|grafana|portainer|phpmyadmin|metrics|graph/i.test(item.path)),
           };
 
-          console.log('[SysAI] Advanced probe success:', {
-            title: titleMatch?.[1]?.trim() || '',
+          devLog('[SysAI] Advanced probe success:', {
+            title: cleanTitle,
             status: response.status,
             finalUrl: response.url,
             htmlLength: html.length,
@@ -958,15 +1214,17 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
             url,
             status: response.status,
             finalUrl: response.url,
-            title: titleMatch?.[1]?.trim() || '',
+            title: cleanTitle,
             htmlLength: html.length,
+            responseSize: html.length,
+            redirectChain,
+            adminHints,
             fingerprint,
-            headers: Object.fromEntries(response.headers.entries())
+            headers: Object.fromEntries(response.headers.entries()),
+            htmlSample: html.slice(0, 120000)
           };
         } catch (error) {
-          clearTimeout(timeout);
-
-          console.error('[SysAI] Advanced probe failed:', error);
+          devLog('[SysAI] Advanced probe failed:', error.message);
 
           return {
             success: false,
@@ -975,8 +1233,6 @@ ipcMain.handle('run-scan', async (event, { type, target, options = {} }) => {
             error: error.message
           };
         }
-
-        break;
       }
 
       case 'http-headers': {

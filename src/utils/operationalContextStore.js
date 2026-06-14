@@ -131,15 +131,6 @@ export function normalizeOperationalContext(context) {
       known_incidents: uniqueList(merged.memory.known_incidents, 20),
       inferred_stack: uniqueList(merged.memory.inferred_stack, 20),
     },
-    memory: {
-      known_services: uniqueList(merged.memory.known_services, 30),
-      known_containers: uniqueList(merged.memory.known_containers, 30),
-      known_ports: uniqueList(merged.memory.known_ports, 30),
-      known_paths: uniqueList(merged.memory.known_paths, 30),
-      known_domains: uniqueList(merged.memory.known_domains, 30),
-      known_incidents: uniqueList(merged.memory.known_incidents, 20),
-      inferred_stack: uniqueList(merged.memory.inferred_stack, 20),
-    },
     baseline: {
       known_services: uniqueList(merged.baseline.known_services, 30),
       known_containers: uniqueList(merged.baseline.known_containers, 30),
