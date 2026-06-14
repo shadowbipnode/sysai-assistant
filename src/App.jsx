@@ -24,6 +24,7 @@ import CommandPalette from "./components/CommandPalette";
 import QuickModelSwitcher from "./components/QuickModelSwitcher";
 import OperationalContextPanel from "./components/OperationalContextPanel";
 import { updateOperationalMemory } from "./utils/operationalContextStore";
+import { normalizeProfessionalOutput } from "./utils/professionalOutput";
 
 function App() {
   const [lang, setLang] = useState("en");
@@ -282,11 +283,11 @@ function App() {
       
       const result = extractJsonObject(response);
       if (result) {
-        const normalizedResult = {
+        const normalizedResult = normalizeProfessionalOutput({
           ...result,
           reasoning_summary: result.reasoning_summary || result.operational_reasoning || (
             result.root_cause
-              ? `SysAI prioritizes this diagnosis because the root cause is supported by the extracted evidence and the recommended first action is designed to validate the issue before making changes.`
+              ? `This diagnosis is prioritized because the root cause is supported by the extracted evidence and the recommended first action is designed to validate the issue before making changes.`
               : ""
           ),
           decision_factors: result.decision_factors || [
@@ -298,7 +299,7 @@ function App() {
               ? `The first action is prioritized because it is the safest initial validation step before remediation.`
               : ""
           ),
-        };
+        }, { title: "Log analysis result", severity: "LOW", confidence: "MEDIUM" });
         learnFromOperationalResult(normalizedResult, "Log Analyzer incident");
         showToast("Analisi completata!", "success");
 
@@ -337,18 +338,19 @@ function App() {
       
       const result = extractJsonObject(response);
       if (result) {
-        learnFromOperationalResult(result, "Troubleshooter incident");
+        const normalizedResult = normalizeProfessionalOutput(result, { title: "Command result", severity: "LOW" });
+        learnFromOperationalResult(normalizedResult, "Command Crafter result");
         showToast("Comando generato!", "success");
         history.addEntry({
           tool: 'commandCrafter',
           toolName: t.modes.commandCrafter.name,
           toolIcon: t.modes.commandCrafter.icon,
           input: cmdText,
-          output: result,
+          output: normalizedResult,
           provider: defaultProvider,
           model: model,
         });
-        return result;
+        return normalizedResult;
       }
       return { command: response, explanation: "Comando generato" };
     } catch (error) {
@@ -373,17 +375,18 @@ function App() {
       
       const result = extractJsonObject(response);
       if (result) {
+        const normalizedResult = normalizeProfessionalOutput(result, { title: "Command explanation", severity: "LOW" });
         showToast("Spiegazione completata!", "success");
         history.addEntry({
           tool: 'explainMode',
           toolName: t.modes.explainMode.name,
           toolIcon: t.modes.explainMode.icon,
           input: command,
-          output: result,
+          output: normalizedResult,
           provider: defaultProvider,
           model: model,
         });
-        return result;
+        return normalizedResult;
       }
       return { summary: response, lines: [], risks: null, improvements: null };
     } catch (error) {
@@ -408,17 +411,18 @@ function App() {
       
       const result = extractJsonObject(response);
       if (result) {
+        const normalizedResult = normalizeProfessionalOutput(result, { title: result.filename || "Generated configuration", severity: "LOW" });
         showToast("Configurazione generata!", "success");
         history.addEntry({
           tool: 'configGenerator',
           toolName: t.modes.configGenerator.name,
           toolIcon: t.modes.configGenerator.icon,
           input: `[${configType}] ${description}`,
-          output: result,
+          output: normalizedResult,
           provider: defaultProvider,
           model: model,
         });
-        return result;
+        return normalizedResult;
       }
       return { filename: "config.conf", config: response, explanation: "Configurazione generata" };
     } catch (error) {
@@ -443,17 +447,18 @@ function App() {
       
       const result = extractJsonObject(response);
       if (result) {
+        const normalizedResult = normalizeProfessionalOutput(result, { title: "Troubleshooting diagnosis", severity: "LOW" });
         showToast("Diagnosi completata!", "success");
         history.addEntry({
           tool: 'troubleshooter',
           toolName: t.modes.troubleshooter.name,
           toolIcon: t.modes.troubleshooter.icon,
           input: problem,
-          output: result,
+          output: normalizedResult,
           provider: defaultProvider,
           model: model,
         });
-        return result;
+        return normalizedResult;
       }
       return null;
     } catch (error) {
@@ -478,7 +483,7 @@ function App() {
       
       const parsedScript = extractJsonObject(response);
       if (parsedScript?.script) {
-        const result = {
+        const result = normalizeProfessionalOutput({
           filename: parsedScript.filename || `script.${scriptType === 'python' ? 'py' : scriptType === 'powershell' ? 'ps1' : scriptType === 'nodejs' ? 'js' : 'sh'}`,
           script: parsedScript.script,
           usage: parsedScript.usage || "",
@@ -495,7 +500,7 @@ function App() {
           rollback: parsedScript.rollback || "",
           safety_notes: parsedScript.safety_notes || "",
           assumptions: parsedScript.assumptions || [],
-        };
+        }, { title: parsedScript.filename || "Generated script", severity: "MEDIUM" });
 
         showToast("Script generato!", "success");
         history.addEntry({
@@ -551,17 +556,18 @@ function App() {
       
       const result = extractJsonObject(response);
       if (result) {
+        const normalizedResult = normalizeProfessionalOutput(result, { title: "Security audit result", severity: "LOW" });
         showToast("Analisi sicurezza completata!", "success");
         history.addEntry({
           tool: 'securityAuditor',
           toolName: t.modes.securityAuditor.name,
           toolIcon: t.modes.securityAuditor.icon,
           input: sourceText,
-          output: result,
+          output: normalizedResult,
           provider: defaultProvider,
           model: model,
         });
-        return result;
+        return normalizedResult;
       }
       return { report: response, recommendations: "Verifica manuale consigliata" };
     } catch (error) {
@@ -586,17 +592,18 @@ function App() {
       
       const result = extractJsonObject(response);
       if (result) {
+        const normalizedResult = normalizeProfessionalOutput(result, { title: "Security scan result", severity: "LOW" });
         showToast("Analisi scan completata!", "success");
         history.addEntry({
           tool: 'securityAuditor',
           toolName: t.modes.securityAuditor.name,
           toolIcon: t.modes.securityAuditor.icon,
           input: `[${scanType}] ${targetHost}`,
-          output: result,
+          output: normalizedResult,
           provider: defaultProvider,
           model: model,
         });
-        return result;
+        return normalizedResult;
       }
       return { report: response, recommendations: "Verifica manuale consigliata" };
     } catch (error) {
@@ -1054,13 +1061,14 @@ function App() {
             onScan={handleSecurityScan} 
             onLocalResult={({ scanType, input, output }) => {
               history.addEntry({
-                tool: "securityAuditor",
+                tool: "securityAuditorLocal",
                 toolName: t.modes.securityAuditor.name,
                 toolIcon: t.modes.securityAuditor.icon,
                 input,
                 output,
                 provider: "local",
                 model: scanType,
+                sensitive: true,
               });
             }}
             onBack={() => setPage("home")} 
@@ -1125,6 +1133,8 @@ function App() {
             bg={bg}
             text1={text1}
             text2={text2}
+            historyEnabled={history.enabled}
+            onSetHistoryEnabled={history.setEnabled}
           />
         )}
 
@@ -1145,6 +1155,8 @@ function App() {
             text1={text1}
             text2={text2}
             showFavoritesOnly={true}
+            historyEnabled={history.enabled}
+            onSetHistoryEnabled={history.setEnabled}
           />
         )}
 

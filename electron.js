@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const https = require('https');
 
 let mainWindow;
+const proxySessionToken = crypto.randomBytes(32).toString('base64url');
 
 function devLog(...args) {
   if (process.env.NODE_ENV === 'development') {
@@ -109,7 +110,7 @@ function startProxy() {
   proxyProcess = spawn(process.execPath, [serverPath], {
     stdio: 'pipe',
     detached: false,
-    env: { ...process.env, PORT: '3001', ELECTRON_RUN_AS_NODE: '1' }
+    env: { ...process.env, PORT: '3001', ELECTRON_RUN_AS_NODE: '1', SYSAI_PROXY_SESSION_TOKEN: proxySessionToken }
   });
 
   proxyProcess.stdout?.on('data', (data) => {
@@ -1370,6 +1371,10 @@ ipcMain.handle('get-app-version', () => {
     platform: process.platform,
     arch: process.arch,
   };
+});
+
+ipcMain.handle('get-proxy-session-token', () => {
+  return { success: true, token: proxySessionToken };
 });
 
 // Controllo aggiornamenti GitHub Releases. Fallisce in modo silenzioso se offline.

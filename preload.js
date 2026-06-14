@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const ALLOWED_CHANNELS = [
   'run-scan',           // Scansioni di rete (port-scan, tls-check, ssh-audit)
   'get-app-version',    // Info versione app
+  'get-proxy-session-token',
   'check-for-updates',   // Controlla nuove release GitHub
   'open-external',      // Apri link nel browser
   'verify-license',     // Verifica firma license key

@@ -13,7 +13,8 @@ export function auditDockerCompose(input) {
 
   // docker.sock exposure
   if (
-    text.includes("/var/run/docker.sock:/var/run/docker.sock")
+    text.includes("/var/run/docker.sock:/var/run/docker.sock") ||
+    text.includes("/var/run/docker.sock")
   ) {
     findings.push(
       finding(
@@ -45,6 +46,17 @@ export function auditDockerCompose(input) {
         "HIGH",
         "The compose file uses host networking.",
         "Prefer bridge networking unless host mode is strictly required."
+      )
+    );
+  }
+
+  if (/ports\s*:\s*[\s\S]*?(?:-\s*)?["']?0\.0\.0\.0:/i.test(text)) {
+    findings.push(
+      finding(
+        "Service explicitly bound to all interfaces",
+        "HIGH",
+        "A published port is bound to 0.0.0.0.",
+        "Bind administrative or internal services to 127.0.0.1 or keep them on internal Docker networks."
       )
     );
   }
@@ -82,7 +94,7 @@ export function auditDockerCompose(input) {
   ];
 
   riskyPorts.forEach((port) => {
-    const regex = new RegExp(`["']?${port}:${port}["']?`);
+    const regex = new RegExp(`["']?(?:0\\.0\\.0\\.0:)?${port}:${port}["']?`);
 
     if (regex.test(text)) {
       findings.push(
@@ -91,6 +103,26 @@ export function auditDockerCompose(input) {
           "HIGH",
           `The compose file exposes database port ${port} to the host.`,
           "Bind database services to localhost or internal Docker networks only."
+        )
+      );
+    }
+  });
+
+  const riskyMounts = [
+    ["/", "Host root filesystem mounted"],
+    ["/etc", "Host /etc mounted"],
+    ["/var/lib/docker", "Docker data directory mounted"],
+    ["/home", "Host home directory mounted"],
+  ];
+
+  riskyMounts.forEach(([mountPath, title]) => {
+    if (new RegExp(`[-\\s"']${mountPath.replace(/\//g, "\\/")}[:\\s]`).test(text)) {
+      findings.push(
+        finding(
+          title,
+          "HIGH",
+          `The compose file references a bind mount for ${mountPath}.`,
+          "Use narrow, read-only bind mounts where possible and avoid mounting broad host paths into containers."
         )
       );
     }

@@ -1,6 +1,6 @@
 {
   "name": "sysai-assistant",
-  "version": "1.7.0-beta",
+  "version": "1.8.0-beta",
   "private": true,
   "author": {
     "name": "SysAI Team",
@@ -13,6 +13,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "vitest run",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
     "electron:build": "vite build && electron-builder --config electron-builder.json",
@@ -49,6 +50,7 @@
     "react-dom": "^19.2.5",
     "tailwindcss": "^4.2.4",
     "vite": "^8.0.9",
+    "vitest": "^4.1.8",
     "wait-on": "^8.0.0"
   }
 }

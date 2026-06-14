@@ -269,6 +269,19 @@ export function hasFeature(featureName) {
 
   return features.includes('all_tools') || features.includes(featureName);
 }
+
+async function getRuntimeAppVersion() {
+  if (window.electron?.ipcRenderer?.invoke) {
+    try {
+      const info = await window.electron.ipcRenderer.invoke('get-app-version');
+      if (info?.version) return info.version;
+    } catch {
+      return 'unknown';
+    }
+  }
+  return 'unknown';
+}
+
 export async function activateLicense(key) {
   const result = await validateLicense(key);
 
@@ -282,7 +295,7 @@ export async function activateLicense(key) {
     const onlineActivation = await activateOnlineLicense({
       license_id: result.id,
       device_id: deviceId,
-      app_version: '1.5.0',
+      app_version: await getRuntimeAppVersion(),
       platform: window.electron?.platform || navigator.platform || 'unknown',
     });
 
