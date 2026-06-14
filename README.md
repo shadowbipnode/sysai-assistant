@@ -18,13 +18,17 @@
 </p>
 
 <p align="center">
+  <strong>🚀 SysAI Pro Beta Access Available</strong><br>
+  A limited number of beta licenses are currently available for early adopters and testers.
+</p>
+
+<p align="center">
   ⚡ Lightning donations: <strong>donate@shadowbip.com</strong>
 </p>
 
 <p align="center">
   <img src="assets/sysai-demo.gif" alt="SysAI Demo" width="100%">
 </p>
-
 <p align="center">
   <strong>Environment-aware diagnostics • rollback-aware remediation • structured operational workflows</strong>
 </p>
