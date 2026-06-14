@@ -87,52 +87,67 @@ jobs:
           prerelease: false
           body: |
 
-            SysAI v1.6.0-beta significantly expands operational intelligence, trust-awareness and troubleshooting workflow capabilities.
+            SysAI Assistant v1.7.0-beta expands Security & Exposure Intelligence with deeper infrastructure scanning, local-first CSR generation, improved operational runbooks, and stronger security audit workflows.
 
             ---
 
             ## Highlights
 
-            ### Operational Trust & Safety
-            - remediation safety scoring
-            - evidence quality analysis
-            - rollback trust semantics
-            - verification trust semantics
-            - assumptions vs verified evidence separation
-            - safer rollback logic
-            - improved anti-hallucination operational safeguards
+            ### Security & Exposure Intelligence
+            - Infrastructure Intelligence target scanner
+            - Service Matrix and Attack Surface Summary
+            - HTTP/HTTPS, SSH, mail, database and web service intelligence
+            - Redirect host analysis and target normalization for domains and full URLs
+            - Exposure scoring improvements
+            - Metadata leak and version disclosure analysis
+            - Admin/login surface detection
+            - Better separation between remote scans and local audits
 
-            ### Operational Intelligence
-            - environment-aware diagnostics
-            - context-linked operational history
-            - improved workflow continuity foundations
-            - multilingual operational consistency improvements
-            - reasoning transparency enhancements
-            - safer infrastructure remediation logic
+            ### Local-first CSR Generator
+            - Generate private keys and certificate signing requests locally
+            - RSA 2048 and RSA 4096 support
+            - ECDSA P-256 and ECDSA P-384 support
+            - SAN DNS and IP support
+            - Equivalent OpenSSL command output
+            - Copy/export workflows for private key and CSR
+            - No AI provider usage and no network transmission for CSR material
 
-            ### UX Improvements
-            - improved live history search
-            - homepage → history workflow integration
-            - refined operational result rendering
-            - clearer operational trust visualization
+            ### Secret Detection
+            - Expanded local-first secret detection
+            - Better masking of sensitive values
+            - Support for common config secrets, tokens, private keys and credential URLs
+            - Safer handling of sensitive local inputs
 
-            ### Included Features
-            - 7 operational AI tools
-            - Windows installer + portable builds
-            - Linux AppImage / DEB / RPM
-            - local-first architecture
-            - multi-provider support
-            - Ollama fully local/offline support
-            - integrated security scanners
-            - rollback-aware workflows
+            ### Permission Auditing
+            - Filesystem and permission audit improvements
+            - World-writable path detection
+            - SSH permission checks
+            - Docker socket exposure checks
+            - Sudoers risk analysis
+
+            ### Operational Runbooks
+            - Generate operational runbooks from troubleshooting and security results
+            - Verification steps
+            - Remediation guidance
+            - Rollback notes
+            - Prevention recommendations
+
+            ### Workflow Improvements
+            - Improved command palette coverage
+            - Better workflow continuity across security and troubleshooting sessions
+            - Reduced stale-result leakage between scan modes
+            - Improved history handling for meaningful operational outputs
+            - Updated multilingual UI coverage for English, Italian, French, German and Spanish
 
             ---
 
             ## Notes
 
-            This is still a beta-stage release intended for testing and operational feedback.
+            This is a beta-stage release intended for testing, feedback and operational evaluation.
 
-            Always review AI-generated commands and remediation steps before applying them to production infrastructure.
+            Always review generated commands, remediation steps and security recommendations before applying them to production infrastructure.
+
+            CSR/private key generation is local-first, but private keys are sensitive: store them securely and never share them unintentionally.
 
             ---
 
@@ -141,8 +156,11 @@ jobs:
             GitHub:
             https://github.com/shadowbipnode/sysai-assistant
 
-            Support development:
+            Support development on GitHub Sponsors:
             https://github.com/sponsors/shadowbipnode
+
+            Lightning donation:
+            donate@shadowbip.com
 
 
           files: |
