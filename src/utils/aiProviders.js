@@ -1,14 +1,30 @@
 import { buildOperationalContextBlock } from './operationalContextPrompt';
 import { detectOperationalContext, formatOperationalContext } from './environmentDetection';
 
-/**
- * SysAI - AI Provider Configuration & Prompt Engineering
- * 
- * Tutte le chiamate passano dal proxy locale (server.js su :3001).
- * Le API key non escono mai dal processo locale.
- */
 
 const PROXY_BASE = 'http://127.0.0.1:3001';
+let proxySessionTokenPromise = null;
+
+async function getProxyHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+
+  if (!window.electron?.ipcRenderer?.invoke) {
+    return headers;
+  }
+
+  if (!proxySessionTokenPromise) {
+    proxySessionTokenPromise = window.electron.ipcRenderer
+      .invoke('get-proxy-session-token')
+      .catch(() => null);
+  }
+
+  const tokenResult = await proxySessionTokenPromise;
+  if (tokenResult?.success && tokenResult.token) {
+    headers['X-SysAI-Session'] = tokenResult.token;
+  }
+
+  return headers;
+}
 
 // ============================================================
 // PROVIDER DEFINITIONS
@@ -80,7 +96,7 @@ export async function callAI(providerId, apiKey, prompt, model) {
 
   const response = await fetch(`${PROXY_BASE}/api/${providerId}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await getProxyHeaders(),
     body: JSON.stringify(body),
   });
 
@@ -101,7 +117,7 @@ export async function fetchModels(providerId, apiKey, baseURL) {
     const body = { apiKey, baseURL };
     const response = await fetch(`${PROXY_BASE}/api/models/${providerId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getProxyHeaders(),
       body: JSON.stringify(body),
     });
     const data = await response.json();
@@ -628,7 +644,7 @@ Respond STRICTLY with this JSON format:
   "detected_stack": ["systemd", "Docker/Compose", "nginx/reverse-proxy", "Bitcoin Core", "LND/Lightning", "Tor"],
   "next_best_action": "the single safest first command/action",
   "root_cause": "likely root cause and why",
-  evidence": ["specific facts from the problem"],
+  "evidence": ["specific facts from the problem"],
   "assumptions": ["assumptions made because details are missing"],
   "reasoning_summary": "Concise operational justification based on evidence and assumptions. Do not reveal hidden chain-of-thought.",
   "decision_factors": ["observed signal or operational factor that influenced the recommendation"],

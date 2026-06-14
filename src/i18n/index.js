@@ -119,18 +119,21 @@ const LANGS = {
         docker: "docker-compose.yml",
         permissions: "ls -la / find / sudoers output",
         nginx: "nginx / Caddy / reverse proxy config",
+        privacy: "Browser, DNS, VPN, headers or telemetry output",
       },
       textPlaceholders: {
         secrets: "Paste configuration content here...\n\nExample:\nDATABASE_URL=postgres://user:password@localhost:5432/app\nAPI_TOKEN=...",
         docker: "Paste docker-compose.yml content here...",
         permissions: "Paste ls -la, find output or sudoers snippets here...",
         nginx: "Paste nginx, Caddy or reverse proxy configuration here...",
+        privacy: "Paste browser leak-test output, response headers, DNS/VPN notes, telemetry config or container metadata...",
       },
       actions: {
         secrets: "Analyze Secrets",
         docker: "Analyze Docker",
         permissions: "Analyze Permissions",
         nginx: "Analyze Proxy",
+        privacy: "Analyze Privacy",
       },
       scanTypes: {
         ports: "Port Scan",
@@ -140,7 +143,9 @@ const LANGS = {
         docker: "Docker Audit",
         permissions: "Permission Audit",
         nginx: "Proxy Audit",
+        privacy: "Privacy Exposure",
         infra: "Infra Intel",
+        watcher: "Port Watcher",
       },
       progress: {
         aiPayload: "Preparing sanitized AI analysis payload...",

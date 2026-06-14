@@ -1,36 +1,23 @@
-/**
- * ═══════════════════════════════════════════════════════════
- * SysAI — useHistory Hook
- * ═══════════════════════════════════════════════════════════
- * 
- * Gestisce la cronologia delle query AI.
- * Salva in localStorage, supporta ricerca e filtri.
- * 
- * Uso:
- *   const { entries, addEntry, searchEntries, deleteEntry, clearAll } = useHistory();
- */
-
 import { useState, useEffect, useCallback } from 'react';
 import { loadOperationalContext } from '../utils/operationalContextStore';
 
 const STORAGE_KEY = 'sysai_history';
+const HISTORY_ENABLED_KEY = 'sysai_history_enabled';
 const MAX_ENTRIES = 500;
+const SENSITIVE_TOOLS = new Set(['securityAuditorLocal', 'csrGenerator']);
 
-/**
- * Struttura di un entry:
- * {
- *   id: string,           // UUID
- *   tool: string,         // "logAnalyzer" | "commandCrafter" | etc
- *   toolName: string,     // "Log Analyzer" (display name)
- *   toolIcon: string,     // "📋"
- *   input: string,        // cosa ha chiesto l'utente
- *   output: object|string,// risposta dell'AI
- *   provider: string,     // "gemini" | "openai" | etc
- *   model: string,        // "gemini-2.0-flash"
- *   timestamp: number,    // Date.now()
- *   favorite: boolean,    // per i preferiti
- * }
- */
+export function redactSensitiveText(value) {
+  return String(value || '')
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '[redacted private key]')
+    .replace(/\b(password|passwd|pwd|passphrase|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret|db[_-]?password|database[_-]?url|redis[_-]?url|private[_-]?key)\b\s*[:=]\s*["']?[^"'\s#]+/gi, '$1=[redacted]')
+    .replace(/[a-z][a-z0-9+.-]*:\/\/[^:\s/@]+:[^@\s]+@[^/\s]+/gi, '[redacted credential url]');
+}
+
+function sanitizeHistoryOutput(value) {
+  if (typeof value === 'string') return redactSensitiveText(value);
+  if (!value || typeof value !== 'object') return value;
+  return JSON.parse(redactSensitiveText(JSON.stringify(value)));
+}
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
@@ -83,21 +70,25 @@ function saveHistory(entries) {
 
 export function useHistory() {
   const [entries, setEntries] = useState([]);
+  const [enabled, setEnabledState] = useState(() => localStorage.getItem(HISTORY_ENABLED_KEY) !== 'false');
 
   // Carica all'avvio
   useEffect(() => {
     setEntries(loadHistory());
   }, []);
 
-  // Aggiungi un entry
-  const addEntry = useCallback(({ tool, toolName, toolIcon, input, output, provider, model }) => {
+  const addEntry = useCallback(({ tool, toolName, toolIcon, input, output, provider, model, sensitive = false, skip = false }) => {
+    if (!enabled || skip || sensitive || SENSITIVE_TOOLS.has(tool)) {
+      return null;
+    }
+
     const entry = {
       id: generateId(),
       tool,
       toolName,
       toolIcon,
-      input: typeof input === 'string' ? input.substring(0, 2000) : JSON.stringify(input).substring(0, 2000),
-      output,
+      input: redactSensitiveText(typeof input === 'string' ? input : JSON.stringify(input)).substring(0, 2000),
+      output: sanitizeHistoryOutput(output),
       provider,
       model,
       contextSnapshot: createContextSnapshot(),
@@ -112,6 +103,12 @@ export function useHistory() {
     });
 
     return entry;
+  }, [enabled]);
+
+  const setEnabled = useCallback((nextEnabled) => {
+    const value = Boolean(nextEnabled);
+    setEnabledState(value);
+    localStorage.setItem(HISTORY_ENABLED_KEY, value ? 'true' : 'false');
   }, []);
 
   // Cerca negli entry
@@ -182,6 +179,8 @@ export function useHistory() {
     getFavorites,
     deleteEntry,
     clearAll,
+    enabled,
+    setEnabled,
     count: entries.length,
   };
 }

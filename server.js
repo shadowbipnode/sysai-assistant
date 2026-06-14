@@ -3,6 +3,7 @@ const cors = require('cors');
 const axios = require('axios');
 
 const app = express();
+const REQUIRED_SESSION_TOKEN = process.env.SYSAI_PROXY_SESSION_TOKEN || '';
 
 // ============================================================
 // CORS SICURO - solo richieste da localhost (Electron renderer)
@@ -19,6 +20,21 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '10mb' }));
+
+app.use((req, res, next) => {
+  if (!REQUIRED_SESSION_TOKEN || req.path === '/health') {
+    next();
+    return;
+  }
+
+  const token = req.get('X-SysAI-Session');
+  if (token !== REQUIRED_SESSION_TOKEN) {
+    res.status(403).json({ error: 'Session token required' });
+    return;
+  }
+
+  next();
+});
 
 // ============================================================
 // HEALTH CHECK

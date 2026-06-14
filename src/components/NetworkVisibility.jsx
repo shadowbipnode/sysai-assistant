@@ -201,6 +201,51 @@ const NetworkVisibility = () => {
   const currentMbps = latestSample?.mbps || 0;
   const currentPps = latestSample?.pps || 0;
   const primaryInterface = interfaces[0]?.interface || "N/A";
+  const protocolCounts = connections.reduce((acc, conn) => {
+    const key = String(conn.netid || "unknown").toUpperCase();
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const topPorts = connections.reduce((acc, conn) => {
+    const address = `${conn.local || ""} ${conn.peer || ""}`;
+    const matches = address.match(/:(\d{1,5})/g) || [];
+    matches.forEach((match) => {
+      const port = match.slice(1);
+      acc[port] = (acc[port] || 0) + 1;
+    });
+    return acc;
+  }, {});
+  const dynamicProtocolOption = {
+    ...protocolOption,
+    series: [{
+      ...protocolOption.series[0],
+      data: Object.entries(protocolCounts).map(([name, value]) => ({ name, value }))
+    }]
+  };
+  const exportReport = () => {
+    const lines = [
+      "# Live Network Visibility Report",
+      "",
+      `Generated: ${new Date().toISOString()}`,
+      `Current throughput: ${currentMbps} Mbps`,
+      `Packets/sec: ${currentPps}`,
+      `Interfaces: ${interfaces.length}`,
+      `Connections: ${connections.length}`,
+      "",
+      "## Top Ports",
+      ...Object.entries(topPorts).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([port, count]) => `- ${port}: ${count} reference(s)`),
+      "",
+      "## Active Connections",
+      ...connections.slice(0, 50).map((conn) => `- ${conn.netid || "-"} ${conn.state || "-"} ${conn.local || "-"} -> ${conn.peer || "-"} ${conn.process || ""}`.trim())
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "network-visibility-report.md";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
 
   return (
@@ -238,6 +283,17 @@ const NetworkVisibility = () => {
         }}>
           LIVE
         </div>
+        <button onClick={exportReport} style={{
+          padding: "8px 14px",
+          borderRadius: 999,
+          background: "#1A1F2E",
+          border: "1px solid #38BDF855",
+          color: "#38BDF8",
+          fontWeight: 700,
+          cursor: "pointer"
+        }}>
+          Export report
+        </button>
       </div>
 
       <div style={{
@@ -346,9 +402,23 @@ const NetworkVisibility = () => {
           </div>
 
           <ReactECharts
-            option={protocolOption}
+            option={dynamicProtocolOption}
             style={{ height: 360 }}
           />
+        </div>
+      </div>
+
+      <div style={{ ...box, marginTop: 18 }}>
+        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 12 }}>
+          Top local ports
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {Object.entries(topPorts).sort((a, b) => b[1] - a[1]).slice(0, 16).map(([port, count]) => (
+            <div key={port} style={{ padding: "8px 10px", borderRadius: 999, background: "#0F131C", border: "1px solid #1E2535", color: "#B8C0D0", fontSize: 12 }}>
+              {port} · {count}
+            </div>
+          ))}
+          {Object.keys(topPorts).length === 0 && <div style={{ color: "#8B95A8", fontSize: 13 }}>No port summary available.</div>}
         </div>
       </div>
 

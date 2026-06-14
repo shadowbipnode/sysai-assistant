@@ -7,13 +7,15 @@ import { detectSecrets } from "../utils/secretDetector";
 import { auditDockerCompose } from "../utils/dockerAudit";
 import { auditPermissions } from "../utils/permissionAudit";
 import { auditNginxConfig } from "../utils/nginxAudit";
+import { auditPrivacyExposure } from "../utils/privacyExposure";
 import { buildInfrastructureSummary, COMMON_PORTS } from "../utils/infrastructureIntel";
 import { fingerprintHttp } from "../utils/httpFingerprint";
 import { buildServiceMatrix } from "../utils/serviceOrchestrator";
+import { comparePortExposure, loadWatcherBaselines, saveWatcherBaseline } from "../utils/serviceWatcher";
 import { parseSshAudit } from "../utils/sshAuditParser";
 import { buildAttackSurfaceSummary, calculateGlobalRisk } from "../utils/exposureRiskEngine";
 
-const localTextScanTypes = ["secrets", "docker", "permissions", "nginx"];
+const localTextScanTypes = ["secrets", "docker", "permissions", "nginx", "privacy"];
 
 const SecurityAuditor = ({ t, onAudit, onScan, onLocalResult, onBack }) => {
   const [mode, setMode] = useState(0);
@@ -27,6 +29,7 @@ const SecurityAuditor = ({ t, onAudit, onScan, onLocalResult, onBack }) => {
   const [result, setResult] = useState(null);
   const [localResult, setLocalResult] = useState(null);
   const [showNetworkVisibility, setShowNetworkVisibility] = useState(false);
+  const [watcherBaseline, setWatcherBaseline] = useState(null);
 
   const updateProgress = (percent, label) => {
     setProgress({ percent, label });
@@ -729,6 +732,67 @@ const SecurityAuditor = ({ t, onAudit, onScan, onLocalResult, onBack }) => {
           };
 
           updateProgress(90, "Reverse proxy audit complete...");
+        } else if (scanType === "privacy") {
+          updateProgress(20, "Running privacy exposure review...");
+
+          const findings = auditPrivacyExposure(sourceText);
+
+          updateProgress(70, "Preparing privacy exposure report...");
+
+          response = {
+            severity: findings.some((f) => f.severity === "HIGH")
+              ? "HIGH"
+              : findings.some((f) => f.severity === "MEDIUM")
+                ? "MEDIUM"
+                : "LOW",
+            confidence: "HIGH",
+            requires_sudo: false,
+            detected_stack: ["privacy", "metadata", "local-analysis"],
+            title: findings.length > 0
+              ? "Privacy exposure signals detected"
+              : "No obvious privacy exposure signals detected",
+            summary: findings.length > 0
+              ? `Detected ${findings.length} metadata, telemetry, resolver or fingerprinting signal(s).`
+              : "No obvious privacy exposure patterns were detected in the provided input.",
+            root_cause: findings.length > 0
+              ? "The provided content includes metadata, DNS, WebRTC, telemetry, or fingerprinting signals that may increase privacy exposure."
+              : "No direct privacy exposure pattern matched the provided content.",
+            next_best_action: findings.length > 0
+              ? "Review the listed metadata and resolver signals before sharing or publishing this output."
+              : "Continue validating DNS, WebRTC and telemetry paths with local browser/network checks.",
+            evidence: findings.map((f) => `${f.title}: ${f.evidence}`),
+            assumptions: [
+              "This review is based only on pasted text or collected headers.",
+              "Network path and browser behavior were not independently verified."
+            ],
+            remediation_safety: "READ_ONLY_SAFE",
+            evidence_quality: findings.length > 0 ? "DIRECT_EVIDENCE" : "PARTIAL_EVIDENCE",
+            rollback_confidence: "ROLLBACK_NOT_REQUIRED",
+            verification_strength: "WEAK_VERIFICATION",
+            verification_reason: "Static privacy indicators are useful triage signals but do not prove live network behavior.",
+            verification_limitations: [
+              "A local browser leak test or controlled DNS query capture is needed for stronger verification.",
+              "Telemetry references may be disabled by runtime configuration not present in the input."
+            ],
+            fix_commands: findings.length > 0
+              ? findings.map((f) => `# ${f.remediation}`)
+              : ["# No remediation required from this static review"],
+            verification_commands: [
+              "# Re-run browser DNS/WebRTC leak checks from the intended network path",
+              "# Review response headers with curl -I against the deployed endpoint"
+            ],
+            rollback_commands: ["No rollback needed for read-only checks."],
+            recommendations: findings.length > 0
+              ? findings.map((f) => f.remediation).join("\n")
+              : "Continue minimizing metadata disclosure and documenting telemetry destinations.",
+            prevention: [
+              "Reduce unnecessary server and framework headers.",
+              "Constrain telemetry destinations and document opt-out behavior.",
+              "Validate DNS and WebRTC behavior from the same client profile used in production."
+            ].join("\n")
+          };
+
+          updateProgress(90, "Privacy review complete...");
         } else if (scanType === "infra") {
           updateProgress(10, "Running infrastructure discovery...");
 
@@ -1272,6 +1336,95 @@ const SecurityAuditor = ({ t, onAudit, onScan, onLocalResult, onBack }) => {
           };
 
           updateProgress(90, "Infrastructure analysis complete...");
+        } else if (scanType === "watcher") {
+          updateProgress(20, "Checking service exposure changes...");
+
+          const scanResult = await portScan(effectiveTarget, {
+            ports: COMMON_PORTS.join(",")
+          });
+
+          const currentOpenPorts = (scanResult.results || []).filter((item) => item.status === "open");
+          const baselines = loadWatcherBaselines();
+          const previous = baselines[effectiveTarget]?.openPorts || [];
+          const delta = comparePortExposure(previous, currentOpenPorts);
+          const baseline = saveWatcherBaseline(effectiveTarget, currentOpenPorts);
+          setWatcherBaseline(baseline);
+
+          const findings = [
+            ...delta.opened.map((item) => ({
+              title: `Newly opened port ${item.port}`,
+              severity: ["docker", "redis", "mysql", "postgresql", "mongodb", "elasticsearch", "lnd-grpc"].includes(item.service) ? "HIGH" : "MEDIUM",
+              evidence: `${item.service || "unknown"} is now reachable on ${effectiveTarget}:${item.port}.`,
+              remediation: "Confirm this exposure is expected and restrict it with firewall, VPN, reverse proxy or private networking if it is not intentional."
+            })),
+            ...delta.closed.map((item) => ({
+              title: `Closed port ${item.port}`,
+              severity: "LOW",
+              evidence: `${item.service || "unknown"} was present in the previous baseline and is no longer reachable.`,
+              remediation: "Confirm whether the service shutdown or firewall change was expected."
+            })),
+            ...delta.changed.map((item) => ({
+              title: `Service changed on port ${item.port}`,
+              severity: "MEDIUM",
+              evidence: `${item.before.service} changed to ${item.after.service} on ${effectiveTarget}:${item.port}.`,
+              remediation: "Review deployment history and validate the service identity from the host or trusted inventory."
+            }))
+          ];
+
+          response = {
+            severity: findings.some((f) => f.severity === "HIGH") ? "HIGH" : findings.some((f) => f.severity === "MEDIUM") ? "MEDIUM" : "LOW",
+            confidence: previous.length ? "HIGH" : "MEDIUM",
+            requires_sudo: false,
+            detected_stack: ["service-watcher", "port-monitoring", "read-only-scan"],
+            title: previous.length ? "Service exposure delta" : "Service exposure baseline captured",
+            summary: previous.length
+              ? `Detected ${delta.opened.length} opened, ${delta.closed.length} closed and ${delta.changed.length} changed service exposure event(s).`
+              : `Captured initial baseline with ${currentOpenPorts.length} reachable port(s).`,
+            root_cause: previous.length
+              ? "Reachable ports or service hints changed compared with the previous local baseline."
+              : "No prior baseline existed for this target.",
+            next_best_action: findings.length
+              ? "Review each exposure delta against an approved change or deployment record."
+              : "Re-run the watcher after the next planned service or firewall change.",
+            evidence: [
+              ...currentOpenPorts.map((p) => `Current open port ${p.port}: ${p.service || "unknown"}`),
+              ...findings.map((f) => `${f.title}: ${f.evidence}`)
+            ],
+            assumptions: [
+              "Port state is observed from this workstation and may differ from other network locations.",
+              "Service names are heuristic hints based on port and banner information."
+            ],
+            remediation_safety: "READ_ONLY_SAFE",
+            evidence_quality: previous.length ? "DIRECT_EVIDENCE" : "PARTIAL_EVIDENCE",
+            rollback_confidence: "ROLLBACK_NOT_REQUIRED",
+            verification_strength: "WEAK_VERIFICATION",
+            verification_reason: "The watcher compares local read-only observations, but network path and filtering can affect results.",
+            verification_limitations: [
+              "A different source network may see different exposure.",
+              "Port banners may not uniquely identify the running service."
+            ],
+            fix_commands: findings.length ? findings.map((f) => `# ${f.remediation}`) : ["# No exposure delta detected"],
+            verification_commands: [
+              "# Re-run the watcher from the same network path",
+              `# Confirm intentional exposure for ${effectiveTarget} in firewall, proxy and service inventory`
+            ],
+            rollback_commands: ["No rollback needed for read-only checks."],
+            recommendations: findings.length
+              ? findings.map((f) => f.remediation).join("\n")
+              : "Keep the baseline and compare again after planned changes.",
+            exposure_timeline: {
+              target: effectiveTarget,
+              captured_at: baseline.capturedAt,
+              previous_open_ports: previous,
+              current_open_ports: baseline.openPorts,
+              opened: delta.opened,
+              closed: delta.closed,
+              changed: delta.changed,
+              service_matrix: delta.serviceMatrix
+            }
+          };
+
+          updateProgress(90, "Watcher baseline updated...");
         }
       } catch (error) {
         response = { report: `Errore: ${error.message}`, recommendations: "Riprova più tardi" };
@@ -1453,21 +1606,21 @@ const SecurityAuditor = ({ t, onAudit, onScan, onLocalResult, onBack }) => {
               🔍 {t.securityAuditorPage.scanTypeLabel}
             </label>
             <div style={{ display: "flex", gap: 8 }}>
-              {["secrets", "docker", "permissions", "nginx"].map((type) => (
+              {["secrets", "docker", "permissions", "nginx", "privacy"].map((type) => (
                 <button key={type} onClick={() => changeScanType(type)} style={{
                   flex: 1, padding: "8px", borderRadius: 8, fontSize: 12,
                   background: scanType === type ? "#00D4AA" : "#1A1F2E",
                   color: scanType === type ? "#0B0E14" : "#8B95A8",
                   border: `1px solid ${scanType === type ? "#00D4AA" : "#1E2535"}`,
                   cursor: "pointer",
-                }}>{type === "secrets" ? "🔑" : type === "docker" ? "🐳" : type === "permissions" ? "🔐" : "🌐"} {t.securityAuditorPage.scanTypes[type]}</button>
+                }}>{type === "secrets" ? "🔑" : type === "docker" ? "🐳" : type === "permissions" ? "🔐" : type === "privacy" ? "🕵️" : "🌐"} {t.securityAuditorPage.scanTypes[type] || type}</button>
               ))}
             </div>
           </div>
 
           <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#8B95A8", marginBottom: 8, display: "block" }}>
-                {scanType === "docker" ? `🐳 ${t.securityAuditorPage.textLabels.docker}` : scanType === "permissions" ? `🔐 ${t.securityAuditorPage.textLabels.permissions}` : scanType === "nginx" ? `🌐 ${t.securityAuditorPage.textLabels.nginx}` : `🔑 ${t.securityAuditorPage.textLabels.secrets}`}
+                {scanType === "docker" ? `🐳 ${t.securityAuditorPage.textLabels.docker}` : scanType === "permissions" ? `🔐 ${t.securityAuditorPage.textLabels.permissions}` : scanType === "nginx" ? `🌐 ${t.securityAuditorPage.textLabels.nginx}` : scanType === "privacy" ? `🕵️ ${t.securityAuditorPage.textLabels.privacy || "Browser, DNS, VPN, headers or telemetry output"}` : `🔑 ${t.securityAuditorPage.textLabels.secrets}`}
               </label>
               <textarea
                 value={sourceText}
@@ -1479,6 +1632,8 @@ const SecurityAuditor = ({ t, onAudit, onScan, onLocalResult, onBack }) => {
                       ? t.securityAuditorPage.textPlaceholders.permissions
                       : scanType === "nginx"
                         ? t.securityAuditorPage.textPlaceholders.nginx
+                        : scanType === "privacy"
+                          ? (t.securityAuditorPage.textPlaceholders.privacy || "Paste browser leak-test output, headers, DNS/VPN notes, telemetry config or container metadata...")
                         : t.securityAuditorPage.textPlaceholders.secrets
                 }
                 style={{
@@ -1496,8 +1651,30 @@ const SecurityAuditor = ({ t, onAudit, onScan, onLocalResult, onBack }) => {
         marginTop: 12, padding: "12px 28px", background: "#00D4AA", color: "#0B0E14",
         border: "none", borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: "pointer",
       }}>
-        {analyzing ? t.securityAuditorPage.analyzing : scanType === "secrets" ? t.securityAuditorPage.actions.secrets : scanType === "docker" ? t.securityAuditorPage.actions.docker : scanType === "permissions" ? t.securityAuditorPage.actions.permissions : scanType === "nginx" ? t.securityAuditorPage.actions.nginx : t.securityAuditorPage.analyze}
+        {analyzing ? t.securityAuditorPage.analyzing : scanType === "secrets" ? t.securityAuditorPage.actions.secrets : scanType === "docker" ? t.securityAuditorPage.actions.docker : scanType === "permissions" ? t.securityAuditorPage.actions.permissions : scanType === "nginx" ? t.securityAuditorPage.actions.nginx : scanType === "privacy" ? (t.securityAuditorPage.actions.privacy || "Analyze Privacy") : scanType === "watcher" ? "Run Watcher" : t.securityAuditorPage.analyze}
       </button>
+
+      {mode === 1 && (
+        <button onClick={() => changeScanType("watcher")} style={{
+          marginTop: 12,
+          marginLeft: 10,
+          padding: "12px 18px",
+          borderRadius: 10,
+          border: "1px solid #38BDF855",
+          background: scanType === "watcher" ? "#38BDF8" : "#131720",
+          color: scanType === "watcher" ? "#0B0E14" : "#38BDF8",
+          fontWeight: 800,
+          cursor: "pointer"
+        }}>
+          🛰️ {t.securityAuditorPage.scanTypes.watcher || "Port Watcher"}
+        </button>
+      )}
+
+      {watcherBaseline && scanType === "watcher" && (
+        <div style={{ marginTop: 12, color: "#8B95A8", fontSize: 12 }}>
+          Watcher baseline updated at {watcherBaseline.capturedAt}. Results are local observations and advisory only.
+        </div>
+      )}
 
       {analyzing && progress && (
         <div style={{

@@ -90,6 +90,8 @@ export default function History({
   text2 = '#8B95A8',
   showFavoritesOnly = false,
   initialQuery = '',
+  historyEnabled = true,
+  onSetHistoryEnabled,
 }) {
   const [searchQuery, setSearchQuery] = useState(initialQuery || '');
   const [toolFilter, setToolFilter] = useState(null);
@@ -207,6 +209,26 @@ export default function History({
           </div>
         )}
       </div>
+
+      {!showFavoritesOnly && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, background: surface, border: `1px solid ${border}`, borderRadius: 12, padding: 12 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14 }}>History privacy</div>
+            <div style={{ color: text2, fontSize: 12, marginTop: 3 }}>Sensitive local audits and generated private keys are excluded automatically.</div>
+          </div>
+          <button onClick={() => onSetHistoryEnabled?.(!historyEnabled)} style={{
+            border: `1px solid ${accent}55`,
+            background: historyEnabled ? accent : surface2,
+            color: historyEnabled ? bg : accent,
+            borderRadius: 9,
+            padding: '8px 12px',
+            fontWeight: 800,
+            cursor: 'pointer',
+          }}>
+            {historyEnabled ? 'History on' : 'History off'}
+          </button>
+        </div>
+      )}
 
       {/* Search bar */}
       <div style={{ position: 'relative', marginBottom: 16 }}>
