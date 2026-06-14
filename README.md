@@ -16,6 +16,11 @@
     <img src="https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-pink?logo=github-sponsors" alt="Sponsor">
   </a>
 </p>
+
+<p align="center">
+  ⚡ Lightning donations: <strong>donate@shadowbip.com</strong>
+</p>
+
 <p align="center">
   <img src="assets/sysai-demo.gif" alt="SysAI Demo" width="100%">
 </p>
@@ -421,20 +426,20 @@ Because builds are not yet code-signed, Windows SmartScreen may display a warnin
 ### RPM
 
 ```bash
-sudo dnf install ./sysai-assistant_1.3.3-beta_x86_64.rpm
+sudo dnf install ./sysai-assistant_1.7.0-beta_x86_64.rpm
 ```
 
 ### DEB
 
 ```bash
-sudo apt install ./sysai-assistant_1.3.3-beta_amd64.deb
+sudo apt install ./sysai-assistant_1.7.0-beta_amd64.deb
 ```
 
 ### AppImage
 
 ```bash
-chmod +x sysai-assistant_1.3.3-beta_x86_64.AppImage
-./sysai-assistant_1.3.3-beta_x86_64.AppImage
+chmod +x sysai-assistant_1.7.0-beta_x86_64.AppImage
+./sysai-assistant_1.7.0-beta_x86_64.AppImage
 ```
 
 ---
